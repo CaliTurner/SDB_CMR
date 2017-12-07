@@ -1,19 +1,19 @@
 ---
 title: "Abundance of green turtles in San Diego Bay 2017"
 author: "Tomo Eguchi"
-date: "September 14, 2017"
+date: '`r Sys.Date()`'
 output: word_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+```{r setup, include=FALSE, message=FALSE, echo=FALSE}
+#knitr::opts_chunk$set(echo = TRUE)
 rm(list=ls())
 library(tidyverse)
 library(lubridate)
 library(geosphere)
 library(RMark)
 library(rjags)
-library(ggplot2)
+#library(ggplot2)
 source('Cm_SDB_functions.R')
 ```
 
