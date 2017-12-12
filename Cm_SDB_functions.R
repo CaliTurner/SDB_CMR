@@ -69,10 +69,11 @@ sample_sim <- function(n_sim_reps,N,p,k,nz = 50,
   sample.n.out <- matrix(nrow = n_sim_reps,
                          ncol = k)
 
-  data.out <- vector(mode = 'list', length = n_sim_reps)
+  data.out <- bayes.diag <- bayes.DIC <- bayes.model <- vector(mode = 'list',
+                                                               length = n_sim_reps)
   r <- 1   # this helps when running line by line
   for(r in 1:n_sim_reps){
-    #
+    print(paste('Simulation', r, 'of', n_sim_reps))
     #function to create capture histories from simulated data
     sim.out <- sim.data(N=N, p=p, k=k)
     data.out[[r]] <- sim.out$y.full
@@ -81,25 +82,60 @@ sample_sim <- function(n_sim_reps,N,p,k,nz = 50,
     # note that "Closed" with get.real(m0, "N") as shown in this example
     # does not work because Closed models have no N parameter.
     M.dot <- mark(sim.out$capt.hist,
-               model = "Closed",
-               model.parameters = list(p = p.dot),
-               silent = T,
-               output = F,
-               delete = T)
+                  model = "Closed",
+                  model.parameters = list(p = p.dot),
+                  silent = T,
+                  output = F,
+                  delete = T)
 
     M.t <- mark(sim.out$capt.hist,
-               model = "Closed",
-               model.parameters = list(p = p.time),
-               silent = T,
-               output = F,
-               delete = T)
+                model = "Closed",
+                model.parameters = list(p = p.time),
+                silent = T,
+                output = F,
+                delete = T)
+
+    dp.Huggins <- process.data(data = sim.out$capt.hist,
+                               model = 'Huggins')
+    ddl.Huggins <- make.design.data(dp.Huggins)
+
+    Mt.Huggins <- mark(data = dp.Huggins,
+                       ddl = ddl.Huggins,
+                       model.parameters = list(p = p.time),
+                       silent = T,
+                       output = F,
+                       delete = T)
 
     #pull off just the estimate of N (you can select other parameters if you want)
     p.dot.hat <- get.real(M.dot, "p")
-    N.dot.hat <- get.real(M.dot, 'f0')[[1]] + nrow(sim.out$capt.hist)
+    p.dot.se <- M.dot[["results"]][["real"]][["se"]][1]
+    p.dot.lcl<- M.dot[["results"]][["real"]][["lcl"]][1]
+    p.dot.ucl<- M.dot[["results"]][["real"]][["ucl"]][1]
+
+    N.dot.hat <- M.dot[["results"]][["derived"]][["N Population Size"]][["estimate"]]
+    N.dot.se <- M.dot[["results"]][["derived"]][["N Population Size"]][["se"]]
+    N.dot.lcl <- M.dot[["results"]][["derived"]][["N Population Size"]][["lcl"]]
+    N.dot.ucl <- M.dot[["results"]][["derived"]][["N Population Size"]][["ucl"]]
 
     p.time.hat <- get.real(M.t, "p")
-    N.time.hat <- get.real(M.t, 'f0')[[1]] + nrow(sim.out$capt.hist)
+    p.time.se <- M.t[["results"]][["real"]][["se"]][1:k]
+    p.time.lcl <- M.t[["results"]][["real"]][["lcl"]][1:k]
+    p.time.ucl <- M.t[["results"]][["real"]][["ucl"]][1:k]
+
+    N.time.hat <- M.t[["results"]][["derived"]][["N Population Size"]][["estimate"]]
+    N.time.se <-  M.t[["results"]][["derived"]][["N Population Size"]][["se"]]
+    N.time.lcl <-  M.t[["results"]][["derived"]][["N Population Size"]][["lcl"]]
+    N.time.ucl <-  M.t[["results"]][["derived"]][["N Population Size"]][["ucl"]]
+
+    p.Huggins.hat <- get.real(Mt.Huggins, "p")
+    p.Huggins.se <- Mt.Huggins[["results"]][["real"]][["se"]]
+    p.Huggins.lcl <- Mt.Huggins[["results"]][["real"]][["lcl"]]
+    p.Huggins.ucl <- Mt.Huggins[["results"]][["real"]][["ucl"]]
+
+    N.Huggins.hat <- Mt.Huggins[["results"]][["derived"]][["N Population Size"]][["estimate"]]
+    N.Huggins.se <- Mt.Huggins[["results"]][["derived"]][["N Population Size"]][["se"]]
+    N.Huggins.lcl <- Mt.Huggins[["results"]][["derived"]][["N Population Size"]][["lcl"]]
+    N.Huggins.ucl <- Mt.Huggins[["results"]][["derived"]][["N Population Size"]][["ucl"]]
 
     # Run Bayesian analysis on the same data:
     bayes.out.Mt <- estim_Bayes(sim.out$y.full,
@@ -129,14 +165,37 @@ sample_sim <- function(n_sim_reps,N,p,k,nz = 50,
                                 n.update = n.update,
                                 n.iter = n.iter * 2)
 
+    bayes.diag[[r]] <- c(bayes.out.M0$diag, bayes.out.Mt$diag, bayes.out.Mh$diag)
+    bayes.DIC[[r]] <- c(bayes.out.M0$DIC, bayes.out.Mt$DIC, bayes.out.Mh$DIC)
+    bayes.model[[r]] <- c(bayes.out.M0$model, bayes.out.Mt$model, bayes.out.Mh$model)
+
     #put in data frame
     new.data <- data.frame(k = k,
                            rep = r,
                            Ndot_hat = N.dot.hat,
+                           Ndot_se = N.dot.se,
+                           Ndot_lcl = N.dot.lcl,
+                           Ndot_ucl = N.dot.ucl,
                            Ntime_hat = N.time.hat,
+                           Ntime_se = N.time.se,
+                           Ntime_lcl = N.time.lcl,
+                           Ntime_ucl = N.time.ucl,
+                           NHuggins_hat = N.Huggins.hat,
+                           NHuggins_se = N.Huggins.se,
+                           NHuggins_lcl = N.Huggins.lcl,
+                           NHuggins_ucl = N.Huggins.ucl,
                            Bayes_Nmed_M0 = bayes.out.M0$summary$quantiles['N', '50%'],
+                           Bayes_Nse_M0 = bayes.out.M0$summary$statistics['N', 'SD'],
+                           Bayes_Nlcl_M0 = bayes.out.M0$summary$quantiles['N', '2.5%'],
+                           Bayes_Nucl_M0 = bayes.out.M0$summary$quantiles['N', '97.5%'],
                            Bayes_Nmed_Mt = bayes.out.Mt$summary$quantiles['N', '50%'],
-                           Bayes_Nmed_Mh = bayes.out.M0$summary$quantiles['N', '50%'])
+                           Bayes_Nse_Mt = bayes.out.Mt$summary$statistics['N', 'SD'],
+                           Bayes_Nlcl_Mt = bayes.out.Mt$summary$quantiles['N', '2.5%'],
+                           Bayes_Nucl_Mt = bayes.out.Mt$summary$quantiles['N', '97.5%'],
+                           Bayes_Nmed_Mh = bayes.out.Mh$summary$quantiles['N', '50%'],
+                           Bayes_Nse_Mh = bayes.out.Mh$summary$statistics['N', 'SD'],
+                           Bayes_Nlcl_Mh = bayes.out.Mh$summary$quantiles['N', '2.5%'],
+                           Bayes_Nucl_Mh = bayes.out.Mh$summary$quantiles['N', '97.5%'])
 
     #append to output data
     output.data<-rbind(output.data, new.data)
@@ -145,11 +204,19 @@ sample_sim <- function(n_sim_reps,N,p,k,nz = 50,
   }
   #create  summay statistics
   #empirical mean, sd, and cv
-  N.avg <- apply(output.data[, c('Ndot_hat', 'Ntime_hat', 'Bayes_Nmed_M0',
-                                'Bayes_Nmed_Mt', 'Bayes_Nmed_Mh')],
+  N.avg <- apply(output.data[, c('Ndot_hat',
+                                 'Ntime_hat',
+                                 'NHuggins_hat',
+                                 'Bayes_Nmed_M0',
+                                 'Bayes_Nmed_Mt',
+                                 'Bayes_Nmed_Mh')],
                  MARGIN = 2, FUN = mean)
-  N.sd <- apply(output.data[, c('Ndot_hat', 'Ntime_hat', 'Bayes_Nmed_M0',
-                                'Bayes_Nmed_Mt', 'Bayes_Nmed_Mh')],
+  N.sd <- apply(output.data[, c('Ndot_hat',
+                                'Ntime_hat',
+                                'NHuggins_hat',
+                                'Bayes_Nmed_M0',
+                                'Bayes_Nmed_Mt',
+                                'Bayes_Nmed_Mh')],
                 MARGIN = 2, FUN = sd)
 
   N.cv<-N.sd/N.avg
@@ -161,7 +228,10 @@ sample_sim <- function(n_sim_reps,N,p,k,nz = 50,
   output <- list(N.summary=N.summary,
                  N.output=output.data,
                  sample.size = sample.n.out,
-                 data.all = data.out)
+                 data.all = data.out,
+                 bayes.diag = bayes.diag,
+                 bayes.DIC = bayes.DIC,
+                 bayes.model = bayes.model)
   return(output)
 }
 
@@ -234,7 +304,7 @@ estim_Bayes <- function(y.full, modelName,
                    n.chains = n.chains,
                    n.adapt = n.adapt)
 
-  update(jm, n.iter = n.update)
+  #update(jm, n.iter = n.update)
 
   load.module("dic")
   zm <- coda.samples(jm,
