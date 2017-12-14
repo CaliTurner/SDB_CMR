@@ -85,6 +85,8 @@ dat.net <- read_csv(file = 'data/Standardized Net Data.csv') %>%
   mutate(., NetDist = distGeo(cbind(Net_Lon_End1, Net_Lat_End1), 
                            cbind(Net_Lon_End2, Net_Lat_End2))) 
 
+net.dist.mean <- mean(dat.net$NetDist, na.rm = T)
+
 dat.net[is.na(dat.net$NetDist), 'NetDist'] <- mean(dat.net$NetDist, na.rm = T)
 
 dat.net %>% mutate(., NetHrs = difftime(Net_Retrieval_Time, 
@@ -102,22 +104,23 @@ dat.net.summary <- dat.net %>%
 At least one turtle was caught on ```r length(n.turtles)``` days from 2 May 2017 to 6 July 2017, where daily effort ranged from ```r signif(min(dat.net.summary$TotalEffort, na.rm = T), digits = 4)``` to ```r signif(max(dat.net.summary$TotalEffort, na.rm = T), digits = 5)``` m hr of net (mean = ```r signif(mean(dat.net.summary$TotalEffort, na.rm = T), digits = 4)``` and SE = ```r signif(SE(dat.net.summary$TotalEffort), digits = 2)```.
 We caught a total of ```r sum(n.turtles)``` turtles (```r nrow(dat.size.by.ID)``` unique turtles). The maximum number of turtles caught per day was ```r max(n.turtles)``` (mean = ```r signif(mean(n.turtles), digits = 2)```, SE = ```r signif(SE(n.turtles), digits = 2)```).  The number of captures per turtle ranged from 1 to ```r max(n.captures)``` (mean = ```r signif(mean(n.captures), digits = 2)```, SE = ```r signif(SE(n.captures), digits = 2)```).  The CCL of these turtles ranged from ```r min(dat.size.by.ID$CCL)``` to ```r max(dat.size.by.ID$CCL)``` cm (mean = ```r signif(mean(dat.size.by.ID$CCL), digits = 3)```, SE = ```r signif(SE(dat.size.by.ID$CCL), digits = 2)```), whereas CCW ranged from ```r min(dat.size.by.ID$CCW)``` to ```r max(dat.size.by.ID$CCW)``` cm (mean = ```r signif(mean(dat.size.by.ID$CCW), digits = 3)```, SE = ```r signif(SE(dat.size.by.ID$CCW), digits = 2)```).  
 
+On six net deployments, exact locations of these nets were not recorded. Consequently, we were unable to determine the lengths of these nets. We, therefore, used the average net length of all deployments (```r signif(net.dist.mean, digits = 1)```) for these missing values. 
+
 # Statistical analysis
 Capture and non-capture of the ```r nrow(dat.size.by.ID)``` turtles during the study period were used to estimate the total abundance within the south SDB. We used the sampling effort (net hrs) and body size (CCL) as covariates that potentially affected the capture probabilities. CCL was used as a continuous variable or binary categorical variables, where the effect of cut off value was tested at 70, 80, and 90 cm. We used RMark (REF) in R Statistical Computing Environment to run Mark (REF) for the analysis. Closed and Huggins' closed models were used for the estimation process. 
 
 ```{r RMark_1, include = F, echo=F, message=F, cache=TRUE}
 # load results from the most recent run here:
 load('RData/Mark_Analysis_output_2017-09-20.RData')
-
 ```
-Among the closed models compared, the simplest (pdot) was considered the most parsimonious model according to AICc values (Table 1). Estimated abundance from the model was ```r ceiling(Nhat.closed[[1]]$estimate)``` (SE = ```r signif(Nhat.closed[[1]]$se, digits = 3)```) and its 95% CI was ```r signif(Nhat.closed[[1]]$lcl, digits = 3)``` - ```r signif(Nhat.closed[[1]]$ucl, digits = 3)```. Abundance estimates from all models were similar (Table 1).  For the Huggins' models, the model with a covariate of size classes separated by 80 cm was the most parsimonious model.  The top 5 models, however, were within deltaAIC = 2, indicating not much difference among the models. The estimated abundance from the most parsimonious Huggins' model was ```r signif(Nhat.Huggins[[1]]$estimate, digits = 3)``` (SE = ```r signif(Nhat.Huggins[[1]]$se, digits = 3)```) with its 95% CI ```r signif(Nhat.Huggins[[1]]$lcl, digits = 3)``` - ```r signif(Nhat.Huggins[[1]]$ucl, digits = 3)```. As it was the case for the closed models, abundance estimates from the Huggins' models were also similar as well as with closed model sets (Table 1).  
+
+GOODNESS OF FIT RESULTS HERE.
+
+Among the closed models compared, the simplest (pdot) was considered the most parsimonious model according to AICc values, although all three models were within deltaAIC < ```r max(model.list.closed$model.table$DeltaAICc)``` (Table 1). Estimated abundance from the model was ```r ceiling(Nhat.closed[[1]]$estimate)``` (SE = ```r signif(Nhat.closed[[1]]$se, digits = 3)```) and its 95% CI was ```r signif(Nhat.closed[[1]]$lcl, digits = 3)``` - ```r signif(Nhat.closed[[1]]$ucl, digits = 3)```. Abundance estimates from all models were similar (Table 1).  For the Huggins' models, the model with a covariate of size classes separated by 80 cm was the most parsimonious model.  The top 5 models, however, were within deltaAIC < ```r signif(max(model.list.Huggins$model.table$DeltaAICc), digits = 2)```, indicating not much difference among the models. The estimated abundance from the most parsimonious Huggins' model was ```r signif(Nhat.Huggins[[1]]$estimate, digits = 3)``` (SE = ```r signif(Nhat.Huggins[[1]]$se, digits = 3)```) with its 95% CI ```r signif(Nhat.Huggins[[1]]$lcl, digits = 3)``` - ```r signif(Nhat.Huggins[[1]]$ucl, digits = 3)```. As it was the case for the closed models, abundance estimates from the Huggins' models were also similar as well as with closed model sets (Table 1).  Standard error of the estimated abundance was less for the closed model than Huggins' model. 
 
 ```{r Bayes_1, include = F, echo=F, message=F, cache=TRUE}
 # rather than running the whole thing, load the results from the most recent run:
-
 load('RData/Bayes_Analysis_output_2017-09-20.RData')
-
-
 ```
 
 For the Bayesian approach, the individual random effects model (Mh) was the best model according to the deviance information criteria (DIC; Table 2). The estimated abundance (mean) was ```r signif(Bayes.results.table[1, 'N'], digits = 3)``` with its 95% PI ```r Bayes.results.table[1, 'N_lcl']``` - ```r Bayes.results.table[1, 'N_ucl']```.  
