@@ -339,3 +339,109 @@ estim_Bayes <- function(y.full, modelName,
 
 }
 
+estim_Bayes_parallel <- function(y.full,
+                                 modelName,
+                                 params = c("N", "p", "Omega", "deviance"),
+                                 nz = 50,
+                                 n.chains = 5,
+                                 n.adapt = 1000,
+                                 n.update = 5000,
+                                 n.iter = 10000){
+  # also use Bayesian model:
+  y.data <- y.full[rowSums(y.full) > 0,]
+  yobs <- as.matrix(y.data)
+  yaug <- rbind(yobs,
+                array(0, dim = c(nz, dim(yobs)[2])))
+
+  bugs.data <- list(yaug = yaug,
+                    M = nrow(yaug),
+                    T = ncol(yaug))
+
+  if (modelName == 'M0'){
+    inits <- function(yaug){
+      A <- list(z = rep(1, nrow(yaug)),
+                p = runif(1, 0, 1))
+      return(A)}
+
+  } else if (modelName == 'Mt'){
+    inits <- function(yaug){
+      A <- list(z = rep(1, nrow(yaug)),
+                p = runif(ncol(yaug), 0, 1),
+                .RNG.name = "lecuyer::RngStream")
+      return(A)}
+  } else if (modelName == 'Mb'){
+    inits <- function(yaug) list(z = rep(1, nrow(yaug)),
+                             p = runif(1, 0, 1))
+  } else if (modelName == 'Mh'){
+    # for model Mh, capture histories are converted into capture frequencies:
+    y <- sort(apply(y.data, 1, sum), decreasing = TRUE)
+    yaug <- c(y, rep(0, nz))
+    bugs.data <- list(yaug = yaug,
+                      M = length(yaug),
+                      T = ncol(y.data))
+    inits <- function(yaug) list(z = rep(1, length(yaug)),
+                             mean.p = runif(1, 0, 1))
+
+  } else if (modelName == 'Mth'){
+    inits <- function(yaug) list(z = rep(1, nrow(yaug)),
+                             mean.p = runif(ncol(yaug), 0, 1),
+                             sd = runif(1, 0.1, 0.9))
+  } else if (modelName == 'Mtbh'){
+    inits <- function(yaug) list(z = rep(1, nrow(yaug)),
+                                 mean.p = runif(ncol(yaug), 0, 1),
+                                 sd = runif(1, 0.1, 0.9))
+
+  }
+
+  model.file <- paste0('models/Model_', modelName, '.txt')
+
+  # jm <- jags.model(model.file,
+  #                  data = bugs.data,
+  #                  inits,
+  #                  n.chains = n.chains,
+  #                  n.adapt = n.adapt)
+  #
+  # #update(jm, n.iter = n.update)
+  #
+  # load.module("dic")
+  # zm <- coda.samples(jm,
+  #                    variable.names = params,
+  #                    n.iter = n.iter)
+  jags.fit <- jags.parallel(data = bugs.data,
+                            parameters.to.save = params,
+                            model.file = model.file,
+                            n.burnin = 10000,
+                            n.chains = n.chains,
+                            n.iter = n.iter,
+                            n.thin = 1,
+                            jags.module = c('dic', 'glm', 'lecuyer'))
+
+  zm <- as.mcmc(jags.fit)
+
+  g.diag <- gelman.diag(zm)
+  h.diag <- heidel.diag(zm)
+  r.diag <- raftery.diag(zm)
+
+  # dicOut <- dic.samples(jm,
+  #                       n.iter = n.iter,
+  #                       type = "pD")
+  # dicOut2 <- dic.samples(jm,
+  #                        n.iter = n.iter,
+  #                        type = "popt")
+
+  sum_zm <- summary(zm)
+  meanDev <- sum_zm$statistics[rownames(sum_zm$statistics) == "deviance",
+                               colnames(sum_zm$statistics) == "Mean"]
+  sdDev <- sum_zm$statistics[rownames(sum_zm$statistics) == "deviance",
+                             colnames(sum_zm$statistics) == "SD"]
+  DIC <- 0.5*(sdDev^2) + meanDev
+  out <- list(diag = list(g.diag = g.diag,
+                          h.diag = h.diag,
+                          r.diag = h.diag),
+              summary = sum_zm,
+              DIC = DIC,
+              model = model.file,
+              sample = runjags::combine.mcmc(zm))
+  return(out)
+
+}
