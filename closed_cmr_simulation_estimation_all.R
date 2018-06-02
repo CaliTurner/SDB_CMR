@@ -7,6 +7,7 @@ rm(list=ls())
 #data.dir<-"C:/Users/mike/Dropbox/teaching/workshop/13"
 require(RMark)
 library(rjags)
+library(R2jags)
 
 source('Cm_SDB_functions.R')
 run.date <- Sys.Date()
@@ -28,23 +29,17 @@ run.date <- Sys.Date()
 #modelName <- "models/Model_M0.txt"
 
 N <- 60
-#p <- c(0.02, 0.04, 0.06, 0.08, 0.10)
+p <- 0.10
+#k <- 6
 k <- c(6, 8, 10, 12, 14, 16)
-p <- c(0.02, 0.04, 0.06, 0.08, 0.10) #runif(length(k), 0.02, 0.10)
-n_sim_reps <- 2
+#p <- c(0.02, 0.04, 0.06, 0.08, 0.10) #runif(length(k), 0.02, 0.10)
+n_sim_reps <- 100
 
 n.chains <- 5
 n.adapt <- 5000
 n.update <- 5000 # update is not used December 2017
 n.iter <- 50000
 nz <- 100   # # augmented individuals
-
-summary.data <- data.frame(N = numeric(0),
-                           p = numeric(0),
-                           k = numeric(0),
-                           cv = numeric(0),
-                           Nhat = numeric(0),
-                           N.sd = numeric(0))
 
 j <- i <- 1
 for (j in 1:length(p)){
@@ -71,7 +66,8 @@ for (j in 1:length(p)){
                               N = N, p = p[j],
                               k = k[i], nz = nz,
                               n.chains = n.chains, n.adapt = n.adapt,
-                              n.update = n.update, n.iter = n.iter)
+                              n.update = n.update, n.iter = n.iter,
+                              parallel = TRUE)
 
     # estimates and uncertainties for each simulated dataset
     sim.results.all[[i]] <- sim.results$N.output
@@ -94,10 +90,10 @@ for (j in 1:length(p)){
   }
 
   save(list = c('summary.data', 'sample.size',
-                'N', 'p', 'k', 'sim.results.data',
-                'sim.results.all'),
-       file = paste0('RData/closed_simulation_p', p[j]*100,
-                     '_', run.date, '.RData'))
+               'N', 'p', 'k', 'sim.results.data',
+               'sim.results.all'),
+      file = paste0('RData/closed_simulation_p', p[j]*100,
+                    '_', run.date, '.RData'))
 
 }
 

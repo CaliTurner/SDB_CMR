@@ -1,0 +1,364 @@
+---
+title: "Sample size determination"
+author: "Tomo Eguchi"
+date: '`r Sys.Date()`'
+output: word_document
+---
+
+```{r setup, include=FALSE, message=FALSE, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+library(geosphere)
+library(RMark)
+library(rjags)
+library(ggplot2)
+source('Cm_SDB_functions.R')
+```
+
+## Justification for increasing the number of interactions with green turtles in the southern California
+
+The Marine Turtle Ecology and Assessment Program at the SWFSC aims to conduct biennial capture-mark-recapture studies of green turtles in San Diego Bay (SDB) to determine abundance and survival rates of the foraging aggregation. This continues an on-going effort, which resulted in a previous publication of estimated abundances and survival rates (Eguchi et al. 2010) as well as a study to characterize their exceptional somatic growth when a power plant was in operation (Eguchi et al. 2012).  A long-term study can provide changes in abundance and survival rates; precise estimation of these demographic parameters is important for understanding the status of the aggregation. Further, the power plant has been decomissioned in 2010 and dismantled.  The temination of warm effluent from the power plant has changed the surrounding aquatic environment and its effects on green turtles is unknown. Our continous long-term monitoring of the foraging aggregation is essential in understanding how the change in the environment will affect the turtles. 
+
+To determine the sufficient sampling effort to obtain a precise estimate of abundance of green turtles in SDB, a simulation analysis was conducted. The simulation analysis sampled a virtual population of a fixed abundance with a range of capture probabilities that were estimated in the previous study.  The simulated dataset, then, was analyzed to estimate abundance of the virtual population using various statistical models. Uncertainty of the estimated abundance (widths of 95% CIs) was used to determine efficient sampling frequencies (the lowest number of sampling occasions with an acceptable 95% CI). We tested fixed and variable capture probabilities in our simulations. The fixed capture probability scenarios are the "best-case"" scenarios where variability in the critical parameter for abundance estimation is removed. Results from this set of analyses can be useful in determining how large the capture probability should be for obtaining precise estimates of abundance. 
+
+The variable capture probability scenarios are more realistic. Various factors affect the capture probability in the field, such as weather, temperature, and tides. The additional variability in the critical parameter would provide us with more realistic idea of how many times we need to go out to capture turtles in the field. 
+
+#Fixed capture probability
+
+```{r load_data, cache=T, include=F, message=F, echo=F}
+RData.files <- c("RData/closed_simulation_p2_2017-12-12.RData",
+                 "RData/closed_simulation_p4_2017-12-12.RData",
+                 "RData/closed_simulation_p6_2017-12-12.RData",
+                 "RData/closed_simulation_p8_2017-12-12.RData")
+
+ps <- c(0.02, 0.04, 0.06, 0.08)
+ks <- seq(from = 6, to = 16, by = 2)
+
+```
+The abundance of the simulated population was 60, whereas occasion-specific capture probability was fixed at one of ```r ps[1:(length(ps)-1)]``` or ```r ps[length(ps)]``` (Eguchi et al. 2010).  The capture probability determined the average number of individuals captured at each sampling occasion.  For example, when the capture probability was set at 0.06, on average, 3.6 individuals (60 × 0.06) were caught in one sampling occasion.  The number of sampling occasions was varied from ```r min(ks)``` to ```r max(ks)``` with an increment of 2. Resulting capture histories of the 60 individuals were analyzed with closed population models using the maximum likelihood (ML) approach with Mark (http://www.phidot.org) through RMark package (Laake 2013) and the Bayesian approach (Kery and Schaub 2012) with jags (Plummer 2003) through rjags (Plummer 2016) and R2jags (Su and Yajima 2015) packages in R (v. 3.4.1; R Core team). For the ML approach, “closed” and “Huggins’ closed” models were considered where effects of time on capture probability were included.  For the Bayesian approach, effects of time and individuals were included.  The sampling simulation and analyses of the simulated data were repeated 100 times to obtain variability in the estimated abundance.
+
+```{r get_results, cache=T, include=F, message=F, echo=F}
+sample.size.list <- Nestims <- vector(mode = 'list', length = length(RData.files))
+
+for (k0 in 1:length(RData.files)){
+  load(RData.files[k0])
+  sample.size.list[[k0]] <- sample.size
+  all.data <- do.call(rbind, sim.results.all)
+  Nhats <- select(all.data, k, 
+                  Ndot_hat, 
+                  Ntime_hat, 
+                  NHuggins_hat,
+                  Bayes_Nmed_M0, 
+                  Bayes_Nmed_Mt, 
+                  Bayes_Nmed_Mh) %>%
+    transmute(., k = k, ML_M0 = Ndot_hat, 
+              ML_Mt = Ntime_hat, ML_Huggins = NHuggins_hat,
+              Bayes_M0 = Bayes_Nmed_M0, Bayes_Mt = Bayes_Nmed_Mt,
+              Bayes_Mh = Bayes_Nmed_Mh) %>%
+    gather(., Model, Nhat, ML_M0:Bayes_Mh)
+
+  Nlow <- select(all.data, k, Ndot_lcl, 
+                 Ntime_lcl, 
+                 NHuggins_lcl,
+                 Bayes_Nlcl_M0, 
+                 Bayes_Nlcl_Mt, Bayes_Nlcl_Mh) %>%
+    transmute(., k = k, ML_M0 = Ndot_lcl, 
+              ML_Mt = Ntime_lcl, 
+              ML_Huggins = NHuggins_lcl,
+              Bayes_M0 = Bayes_Nlcl_M0, 
+              Bayes_Mt = Bayes_Nlcl_Mt,
+              Bayes_Mh = Bayes_Nlcl_Mh) %>%
+    gather(., Model, Nlow, ML_M0:Bayes_Mh)
+
+  Nhigh <- select(all.data, k, Ndot_ucl, Ntime_ucl, NHuggins_ucl,
+                 Bayes_Nucl_M0, Bayes_Nucl_Mt, Bayes_Nucl_Mh) %>%
+    transmute(., k = k, ML_M0 = Ndot_ucl, 
+              ML_Mt = Ntime_ucl, 
+              ML_Huggins = NHuggins_ucl,
+              Bayes_M0 = Bayes_Nucl_M0, 
+              Bayes_Mt = Bayes_Nucl_Mt,
+              Bayes_Mh = Bayes_Nucl_Mh) %>%
+    gather(., Model, Nhigh, ML_M0:Bayes_Mh)
+
+  Nestims[[k0]] <- data.frame(k = Nhats$k,
+                        model = Nhats$Model,
+                        Nhat = Nhats$Nhat,
+                        Nlow = Nlow$Nlow,
+                        Nhigh = Nhigh$Nhigh) %>%
+    filter(., Nhat < 200) %>%
+    mutate(Nwidth = Nhigh - Nlow) %>%
+    mutate(captureP = ps[k0]) %>%
+    mutate(model_f = factor(model, 
+                            levels = c("ML_M0", "ML_Mt", "ML_Huggins",
+                                       "Bayes_M0", "Bayes_Mt", "Bayes_Mh")))
+}
+
+Nestims.df <- do.call(rbind, Nestims)
+```
+
+Estimated abundance varied significantly when capture probabilities were increased from ```r min(ps)``` to ```r max(ps)``` (Figures 1 through ```r length(ps)```). The true model was M0 or the time-invariant capture probability. As the capture probability increased, the number of outliers (i.e., estimates beyond the 1.5 times IQR, which is indicated by whiskers in the plots) decreased. Widths of 95% CIs narrowed as the capture probabilities increased (Figures ```r length(ps)+1``` through ```r length(ps)*2```).  When the capture probability was ```r max(ps)```, the largest capture probability considered in this section, and with Bayesian Mt model, 95% CI widths ranged from ```r min(filter(Nestims.df, model_f == "Bayes_Mt" & captureP == 0.08) %>% select(Nwidth))``` to ```r max(filter(Nestims.df, model_f == "Bayes_Mt" & captureP == 0.08) %>% select(Nwidth))```, indicating even some of these had wide confidence intervals.  Other models had wider confidence intervals (Figures ```r length(ps)+1``` through ```r length(ps)*2```).  It is important to note that these simulations were conducted assuming a constant capture probability over time, which should be considered as the best case scenario. This is not the case in general, resulting in requiring even larger sample sizes. 
+
+When the capture probability was ```r max(ps)```, the maximum number of turtles caught at one capture occasion was ```r max(unlist(lapply(sample.size.list[[length(ps)]], FUN = max)))``` and the maximum total number of turtles caught during the 16 sampling occasions was ```r max(rowSums(sample.size.list[[length(ps)]][[length(ks)]]))```. Because capture probability in the real sampling will be variable, this number of captures would be the greatest possible.
+
+```{r make_plots, cache=T, include=F, message=F, echo=F}
+ps_Nhats <- ps_CIwidths <- vector(mode = 'list', length = length(ps))
+for (k0 in 1:length(ps)){
+  ps_Nhats[[k0]] <- ggplot(data = Nestims[[k0]]) +
+    geom_boxplot(aes(x = k, y = Nhat, group = k)) +
+    facet_wrap(~ model_f) +
+    scale_x_continuous(name = 'Sample size',
+                       breaks = c(6, 8, 10, 12, 14, 16)) +
+    scale_y_continuous(name = 'Estimated abundance') +
+    ggtitle(paste('Capture probability =', ps[k0])) +
+    geom_hline(yintercept = 60)  +
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.title = element_text(size = 12),
+          axis.text = element_text(size = 12))
+  
+  ps_CIwidths[[k0]] <- ggplot(data = Nestims[[k0]]) +
+    geom_boxplot(aes(x = k, y = Nwidth, group = k)) +
+    facet_wrap(~ model_f, scales = "free_y") +
+    scale_x_continuous(name = 'Sample size',
+                       breaks = c(6, 8, 10, 12, 14, 16)) +
+    scale_y_continuous(name = 'Width of 95% CI') +
+    ggtitle(paste('Capture probability =', ps[k0])) +
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.title = element_text(size = 12),
+          axis.text = element_text(size = 12))
+}
+```
+
+#Variable capture probability
+The next set of simulations included variable capture probabilities (Mt). Capture probability at each capture occasion was drawn from a uniform distribution between 0.02 and 0.1. Similar to the previous analysis, a same dataset was analyzed using six models. One hundred datasets were simulated using the same set of capture probabilities per sampling frequency, i.e., 6, 8, 10, 12, 14, or 16.    
+
+```{r get_pUnif_results, cache=TRUE, echo=FALSE, include=FALSE, message=FALSE}
+RData.files <- c("RData/closed_simulation_pUNIF_k6_2018-01-19.RData",
+                 "RData/closed_simulation_pUNIF_k8_2018-01-22.RData",
+                 "RData/closed_simulation_pUNIF_k10_2018-01-22.RData",
+                 "RData/closed_simulation_pUNIF_k12_2018-01-22.RData",
+                 "RData/closed_simulation_pUNIF_k14_2018-01-22.RData",
+                 "RData/closed_simulation_pUNIF_k16_2018-01-23.RData")
+
+ks_pUnif <- seq(from = 6, to = 16, by = 2)
+k0 <- 1
+# for each capture probability
+sample.sizes.list.pUnif <- sim.results.all.list <- vector(mode = 'list', 
+                                                          length = length(RData.files))
+
+for (k0 in 1:length(RData.files)){
+  load(RData.files[k0])
+  sim.results.all.list[[k0]] <- na.omit(do.call(rbind, sim.results.all)) %>%
+    filter(., k == ks_pUnif[k0])
+  non.zero.idx <- unlist(lapply(lapply(sample.size, dim), length))
+  tmp <- sample.size[non.zero.idx > 0]
+  sample.sizes.list.pUnif[[k0]] <- tmp[[length(tmp)]]
+}
+
+all.data <- do.call(rbind, sim.results.all.list) %>%
+  mutate(n = unlist(lapply(sample.sizes.list.pUnif,
+                           rowSums)))
+
+Nhats <- select(all.data, k, Ndot_hat, Ntime_hat, NHuggins_hat,
+                Bayes_Nmed_M0, Bayes_Nmed_Mt, Bayes_Nmed_Mh, n) %>%
+  transmute(., k = k, n = n,
+            ML_M0 = Ndot_hat,
+            ML_Mt = Ntime_hat,
+            ML_Huggins = NHuggins_hat,
+            Bayes_M0 = Bayes_Nmed_M0,
+            Bayes_Mt = Bayes_Nmed_Mt,
+            Bayes_Mh = Bayes_Nmed_Mh) %>%
+  gather(., Model, Nhat, ML_M0:Bayes_Mh)
+
+Nlow <- select(all.data, k, Ndot_lcl, Ntime_lcl, NHuggins_lcl,
+               Bayes_Nlcl_M0, Bayes_Nlcl_Mt, Bayes_Nlcl_Mh, n) %>%
+  transmute(., k = k, n = n,
+            ML_M0 = Ndot_lcl,
+            ML_Mt = Ntime_lcl,
+            ML_Huggins = NHuggins_lcl,
+            Bayes_M0 = Bayes_Nlcl_M0,
+            Bayes_Mt = Bayes_Nlcl_Mt,
+            Bayes_Mh = Bayes_Nlcl_Mh) %>%
+  gather(., Model, Nlow, ML_M0:Bayes_Mh)
+
+Nhigh <- select(all.data, k, Ndot_ucl, Ntime_ucl, NHuggins_ucl,
+                Bayes_Nucl_M0, Bayes_Nucl_Mt, Bayes_Nucl_Mh, n) %>%
+  transmute(., k = k, n = n,
+            ML_M0 = Ndot_ucl,
+            ML_Mt = Ntime_ucl,
+            ML_Huggins = NHuggins_ucl,
+            Bayes_M0 = Bayes_Nucl_M0,
+            Bayes_Mt = Bayes_Nucl_Mt,
+            Bayes_Mh = Bayes_Nucl_Mh) %>%
+  gather(., Model, Nhigh, ML_M0:Bayes_Mh)
+
+outlier.multiplier <- 3
+Ntrue <- 60
+Nestims <- data.frame(k = Nhats$k,
+                      n = Nhats$n,
+                      model = Nhats$Model,
+                      Nhat = Nhats$Nhat,
+                      Nlow = Nlow$Nlow,
+                      Nhigh = Nhigh$Nhigh) %>%
+  filter(., Nhat < Ntrue * outlier.multiplier) %>%
+  mutate(Nwidth = Nhigh - Nlow) %>%
+  mutate(model_f = factor(model,
+                          levels = c("ML_M0", "ML_Mt", "ML_Huggins",
+                                     "Bayes_M0", "Bayes_Mt", "Bayes_Mh")))
+
+Nestims_ML <- filter(Nestims, model_f == "ML_M0" | 
+                       model_f == "ML_Mt" | 
+                       model_f == "ML_Huggins")
+Nestims_Bayes<- filter(Nestims, model_f == "Bayes_M0" | 
+                       model_f == "Bayes_Mt" | 
+                       model_f == "Bayes_Mh")
+
+
+```
+
+The means of estimates from the ML approach were close to the true value (```r Ntrue```). However, there were ```r 100*length(RData.files)*3 - nrow(Nestims_ML)``` estimates that were greater than ```r outlier.multiplier``` times the true value (Figure 9). The Bayesian approach provided more accurate estimates, where the largest estimate was ```r max(Nestims_Bayes$Nhat)```.  Medians of posterior distribution for the Mt model, however, consistently underestimated the true value (Figure 9). 
+
+Precision of estimates improved with the number of sampling occasions (Figure 10). The widest intervals decreased from ```r signif(max(filter(Nestims, k == min(ks_pUnif))$Nwidth), digits = 2)``` with ```r min(ks_pUnif)``` sampling occasions to ```r signif(max(filter(Nestims, k == max(ks_pUnif))$Nwidth), digits = 2)``` with ```r max(ks_pUnif)``` occasions. 
+
+When there were ```r max(ks_pUnif)``` sampling occasions, sample sizes (the total number of captured turtles) ranged from  ```r min(rowSums(sample.sizes.list.pUnif[[length(ks_pUnif)]]))``` to ```r max(rowSums(sample.sizes.list.pUnif[[length(ks_pUnif)]]))```. The number of captured turtles was negatively correlated with the precision of ML estimates but less so for the Bayesian estimates (Figure 11). When more than 50 turtles were caught, widths of 95% CI were similar among all approaches (Figure 11). Effects of sample sizes affected the two approaches (ML and Bayesian) differently (Figure 12). In general, more than 50 turtles (assuming there are 60 unique individuals) should be caught to obtain precise estimates of abundance.  The optimal number will increase if the abundance of the foraging aggregation increases in the future. The precision will increase with the increasing number of captured turtles. 
+
+As mentioned earlier, the nesting abundance of green turtles in Mexico has been increasing. Assuming it is increasing at 6% annum (need ref... ), and the same rate of increase applies to the foraging aggregation in SDB, there will be over 100 turtles in the bay in 10 years. We also conduct research at two other sites (San Gabriel river and Seal Beach Wildlife National Refuge), necessitating more captures. We request that our non-lethal take to be up to 100 turtles annually. 
+
+```{r make_plots_pUnif, echo=FALSE}
+p.hat.pUnif <- ggplot(data = Nestims) +
+  geom_boxplot(aes(x = k, y = Nhat, group = k)) +
+  facet_wrap(~ model_f) +
+  scale_x_continuous(name = 'Sample size',
+                     breaks = c(6, 8, 10, 12, 14, 16)) +
+  scale_y_continuous(name = 'Estimated abundance') +
+  ggtitle(paste('Capture probability = UNIF(0.02, 0.1)')) +
+  geom_hline(yintercept = 60)  +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 12))
+
+p.CI.pUnif <- ggplot(data = Nestims) +
+  geom_boxplot(aes(x = k, y = Nwidth, group = k)) +
+  facet_wrap(~ model_f, scales = "free_y") +
+  scale_x_continuous(name = 'Sample size',
+                     breaks = c(6, 8, 10, 12, 14, 16)) +
+  scale_y_continuous(name = 'Width of 95% CI') +
+  ggtitle(paste('Capture probability = UNIF(0.02, 0.1)')) +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 12))
+
+p.n.CI.pUnif <- ggplot(data = Nestims) + 
+  geom_point(aes(x = n, y = Nhat, 
+                 size = Nwidth),
+             shape = 1) + 
+  facet_wrap(~ model_f, scales = "free_y") +
+  scale_x_continuous(name = 'Number of captured turtles') +
+  scale_y_continuous(name = 'Estimated abundance') +
+  scale_size_continuous(name = 'Width of 95% CI') +
+  ggtitle(paste('Capture probability = UNIF(0.02, 0.1)')) +
+  geom_hline(yintercept = 60)  +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 12))
+
+p.n.CI.2.pUnif <- ggplot(data = Nestims) + 
+  geom_point(aes(x = n, y = Nwidth, color = model_f),
+             size = 2.0, alpha = 0.5) +
+  scale_x_continuous(name = 'Number of captured turtles') +
+  scale_y_continuous(name = 'Width of 95% CI') +
+  scale_color_discrete(name = 'Model') +
+  ggtitle(paste('Capture probability = UNIF(0.02, 0.1)')) +
+  theme(plot.title = element_text(hjust = 0.5),
+        axis.title = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        legend.position = c(0.7, 0.7))
+```
+
+```{r figure_1, fig.width = 6, fig.height = 5, echo=FALSE}
+ps_Nhats[[1]]
+```
+
+Figure 1. Estimated abundances (maximum likelihood estimate for the ML approach and median for the Bayesian approach) of a virtual population of green turtles in San Diego Bay. The true abundance was ```r Ntrue``` (shown in a horizontal line in each figure) and capture probability was fixed at ```r ps[1]```. Each panel shows results from a estimation approach (ML = maximum likelihood and Bayes = Bayesian) and model (M0 = time-invariant capture probability, Mt = time-dependent capture probability, Mh and Huggins = individual-dependent capture probability). Sampling frequency (sample size) is indicated along the horizontal axis. Each sampling frequency was repeated 100 times. Box plots indicate the mean (horizontal line), inter-quartile range (IQR; box) and whiskers indicate 1.5 times IQR.  
+
+```{r figure_2, fig.width = 6, fig.height = 5, echo=FALSE}
+ps_Nhats[[2]]
+```
+
+Figure 2. Estimated abundances (maximum likelihood estimate for the ML approach and median for the Bayesian approach) of a virtual population of green turtles in San Diego Bay. The true abundance was 60 (shown in a horizontal line in each figure) and capture probability was fixed at ```r ps[2]```. Each panel shows results from a estimation approach (ML = maximum likelihood and Bayes = Bayesian) and model (M0 = time-invariant capture probability, Mt = time-dependent capture probability, Mh and Huggins = individual-dependent capture probability). Sampling frequency (sample size) is indicated along the horizontal axis. Each sampling frequency was repeated 100 times. Box plots indicate the mean (horizontal line), inter-quartile range (IQR; box) and whiskers indicate 1.5 times IQR.  
+
+```{r figure_3, fig.width = 6, fig.height = 5, echo=FALSE}
+ps_Nhats[[3]]
+```
+
+Figure 3. Estimated abundances (maximum likelihood estimate for the ML approach and median for the Bayesian approach) of a virtual population of green turtles in San Diego Bay. The true abundance was 60 (shown in a horizontal line in each figure) and capture probability was fixed at ```r ps[3]```. Each panel shows results from a estimation approach (ML = maximum likelihood and Bayes = Bayesian) and model (M0 = time-invariant capture probability, Mt = time-dependent capture probability, Mh and Huggins = individual-dependent capture probability). Sampling frequency (sample size) is indicated along the horizontal axis. Each sampling frequency was repeated 100 times. Box plots indicate the mean (horizontal line), inter-quartile range (IQR; box) and whiskers indicate 1.5 times IQR.  
+
+```{r figure_4, fig.width = 6, fig.height = 5, echo=FALSE}
+ps_Nhats[[4]]
+```
+
+Figure 4. Estimated abundances (maximum likelihood estimate for the ML approach and median for the Bayesian approach) of a virtual population of green turtles in San Diego Bay. The true abundance was ```r Ntrue``` (shown in a horizontal line in each figure) and capture probability was fixed at ```r ps[4]```. Each panel shows results from a estimation approach (ML = maximum likelihood and Bayes = Bayesian) and model (M0 = time-invariant capture probability, Mt = time-dependent capture probability, Mh and Huggins = individual-dependent capture probability). Sampling frequency (sample size) is indicated along the horizontal axis. Each sampling frequency was repeated 100 times. Box plots indicate the mean (horizontal line), inter-quartile range (IQR; box) and whiskers indicate 1.5 times IQR.  
+
+```{r figure_5, fig.width = 6, fig.height = 5, echo=FALSE}
+ps_CIwidths[[1]]
+```
+
+Figure 5. Widths of 95% CIs around the estimates (maximum likelihood estimate for the ML approach and median for the Bayesian approach) of a virtual population of green turtles in San Diego Bay. The true abundance was ```r Ntrue``` and capture probability was fixed at ```r ps[1]```. Each panel shows results from a estimation approach (ML = maximum likelihood and Bayes = Bayesian) and model (M0 = time-invariant capture probability, Mt = time-dependent capture probability, Mh and Huggins = individual-dependent capture probability). Sampling frequency (sample size) is indicated along the horizontal axis. Each sampling frequency was repeated 100 times. Box plots indicate the mean (horizontal line), inter-quartile range (IQR; box) and whiskers indicate 1.5 times IQR.  
+
+```{r figure_6, fig.width = 6, fig.height = 5, echo=FALSE}
+ps_CIwidths[[2]]
+```
+
+Figure 6. Widths of 95% CIs around the estimates (maximum likelihood estimate for the ML approach and median for the Bayesian approach) of a virtual population of green turtles in San Diego Bay. The true abundance was ```r Ntrue``` and capture probability was fixed at ```r ps[2]```. Each panel shows results from a estimation approach (ML = maximum likelihood and Bayes = Bayesian) and model (M0 = time-invariant capture probability, Mt = time-dependent capture probability, Mh and Huggins = individual-dependent capture probability). Sampling frequency (sample size) is indicated along the horizontal axis. Each sampling frequency was repeated 100 times. Box plots indicate the mean (horizontal line), inter-quartile range (IQR; box) and whiskers indicate 1.5 times IQR. 
+
+```{r figure_7, fig.width = 6, fig.height = 5, echo=FALSE}
+ps_CIwidths[[3]]
+```
+
+Figure 7. Widths of 95% CIs around the estimates (maximum likelihood estimate for the ML approach and median for the Bayesian approach) of a virtual population of green turtles in San Diego Bay. The true abundance was ```r Ntrue``` and capture probability was fixed at ```r ps[3]```. Each panel shows results from a estimation approach (ML = maximum likelihood and Bayes = Bayesian) and model (M0 = time-invariant capture probability, Mt = time-dependent capture probability, Mh and Huggins = individual-dependent capture probability). Sampling frequency (sample size) is indicated along the horizontal axis. Each sampling frequency was repeated 100 times. Box plots indicate the mean (horizontal line), inter-quartile range (IQR; box) and whiskers indicate 1.5 times IQR. 
+
+```{r figure_8, fig.width = 6, fig.height = 5, echo=FALSE}
+ps_CIwidths[[4]]
+```
+
+Figure 8. Widths of 95% CIs around the estimates (maximum likelihood estimate for the ML approach and median for the Bayesian approach) of a virtual population of green turtles in San Diego Bay. The true abundance was ```r Ntrue``` and capture probability was fixed at ```r ps[4]```. Each panel shows results from a estimation approach (ML = maximum likelihood and Bayes = Bayesian) and model (M0 = time-invariant capture probability, Mt = time-dependent capture probability, Mh and Huggins = individual-dependent capture probability). Sampling frequency (sample size) is indicated along the horizontal axis. Each sampling frequency was repeated 100 times. Box plots indicate the mean (horizontal line), inter-quartile range (IQR; box) and whiskers indicate 1.5 times IQR. 
+
+```{r figure_9, fig.width = 6, fig.height = 5, echo=FALSE}
+p.hat.pUnif
+```
+
+Figure 9. Estimated abundances (maximum likelihood estimate for the ML approach and median for the Bayesian approach) of a virtual population of green turtles in San Diego Bay. The true abundance was ```r Ntrue``` (shown in a horizontal line in each figure) and capture probability was drawn from a uniform distribution between 0.02 and 0.1. Each panel shows results from a estimation approach (ML = maximum likelihood and Bayes = Bayesian) and model (M0 = time-invariant capture probability, Mt = time-dependent capture probability, Mh and Huggins = individual-dependent capture probability). Sampling frequency (sample size) is indicated along the horizontal axis. Each sampling frequency was repeated 100 times. Box plots indicate the mean (horizontal line), inter-quartile range (IQR; box) and whiskers indicate 1.5 times IQR.  
+
+```{r figure_10, fig.width = 6, fig.height = 5, echo=FALSE}
+p.CI.pUnif
+```
+
+Figure 10. Widths of 95% CIs around the estimates (maximum likelihood estimate for the ML approach and median for the Bayesian approach) of a virtual population of green turtles in San Diego Bay. The true abundance was ```r Ntrue``` and capture probability was drawn from a uniform distribution between 0.02 and 0.1. Each panel shows results from a estimation approach (ML = maximum likelihood and Bayes = Bayesian) and model (M0 = time-invariant capture probability, Mt = time-dependent capture probability, Mh and Huggins = individual-dependent capture probability). Sampling frequency (sample size) is indicated along the horizontal axis. Each sampling frequency was repeated 100 times. Box plots indicate the mean (horizontal line), inter-quartile range (IQR; box) and whiskers indicate 1.5 times IQR.  
+
+```{r figure_11, fig.width = 6, fig.height = 5, echo=FALSE}
+p.n.CI.2.pUnif
+```
+
+Figure 11. Widths of 95% CIs around the estimates as a function of the total number of captured turtles for a virtual population of green turtles in San Diego Bay. The true abundance was ```r Ntrue``` and capture probability was drawn from a uniform distribution between 0.02 and 0.1. M0 = time-invariant capture probability, Mt = time-dependent capture probability, Mh and Huggins = individual-dependent capture probability    
+
+```{r figure_12, fig.width = 6.5, fig.height = 5.5, echo=FALSE}
+p.n.CI.pUnif
+```
+
+Figure 12. Estimated abundance as a function of Widths of 95% CIs around the estimates (size of points) and the total number of captured turtles for a virtual population of green turtles in San Diego Bay. The true abundance was 60 (indicated by horizontal lines) and capture probability was drawn from a uniform distribution between 0.02 and 0.1. Each panel shows results from an estimation approach (ML = maximum likelihood and Bayes = Bayesian) and model (M0 = time-invariant capture probability, Mt = time-dependent capture probability, Mh and Huggins = individual-dependent capture probability). Sampling frequency (sample size) is indicated along the horizontal axis. Each sampling frequency was repeated 100 times. 
+
+
+##Literature cited
+Eguchi T, Seminoff JA, LeRoux RA, Dutton PH, Dutton DL (2010) Abundance and survival rates of green turtles in an urban environment: coexistence of humans and an endangered species. Mar Biol 157:1869–1877
+
+Eguchi T, Seminoff JA, LeRoux RA, Prosperi D, Dutton DL, Dutton PH (2012) Morphology and growth rates of the green sea turtle (Chelonia mydas) in a northern-most temperate foraging ground. Herpetologica 68:76-87.
+
+Kery M, Schaub M (2012) Bayesian population analysis using WinBUGS. Academic Press, San Diego, CA
+
+Laake JL (2013). RMark: An R Interface for Analysis of Capture-Recapture Data with MARK. AFSC Processed Rep 2013-01, 25p. Alaska Fish. Sci. Cent., NOAA, Natl. Mar. Fish. Serv., 7600 Sand Point Way NE, Seattle WA 98115.
+
+Plummer M (2003) JAGS: A program for analysis of Bayesian graphical models using Gibbs sampling. DSC 2003 Working Papers. Available from http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.13.3406
+
+Plummer M (2016). rjags: Bayesian Graphical Models using MCMC. R package version 4-6. https://CRAN.R-project.org/package=rjags
+
+Su Y-S, Yajima M (2015). R2jags: Using R to Run 'JAGS'. R package version 0.5-7. https://CRAN.R-project.org/package=R2jags

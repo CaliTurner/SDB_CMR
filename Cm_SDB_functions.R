@@ -6,8 +6,8 @@
 
 sysInfo <- Sys.info()
 ifelse(sysInfo[1] == 'Linux',
-       source('~/Documents/R/TomosFunctions.R'),
-       source('~/R/TomosFunctions.R'))
+       source('~/Documents/R/tools/TomosFunctions.R'),
+       source('~/R/tools/TomosFunctions.R'))
 
 ##FIRST DEFINE SOME FUNCTIONS NEEDED
 ## FUNCTION TO CREATE CAPTURE HISTORY CHARACTER STRINGS
@@ -37,7 +37,7 @@ sim.data<-function(N, p, k){
   #capture history data frame
   capt.hist <- data.frame(ch = pasty(y[,1:k]),
                           ind = ind)
-  capt.hist <- subset(capt.hist, ind==T, select=c(ch))
+  capt.hist <- subset(capt.hist, subset = ind, select=c(ch))
 
   sample.n <- colSums(y)
   #end of function
@@ -50,7 +50,8 @@ sim.data<-function(N, p, k){
 
 sample_sim <- function(n_sim_reps,N,p,k,nz = 50,
                        n.chains = 5, n.adapt = 1000,
-                       n.update = 5000, n.iter = 10000) {
+                       n.update = 5000, n.iter = 10000,
+                       parallel = TRUE) {
   # WE CAN DEFINE SOME THINGS OUTSIDE THE LOOP FOR EXAMPLE
   # WE WILL USE THE SAME TIME CONSTANT MODEL EACH SIMU;LLATION
   # Define parameters
@@ -58,13 +59,29 @@ sample_sim <- function(n_sim_reps,N,p,k,nz = 50,
   p.time <- list(formula = ~time, share = TRUE)
 
   #set up an empty data frame to store all the simulation results
-  output.data <- data.frame(k=numeric(0),
-                            rep=numeric(0),
-                            Ndot_hat=numeric(0),
+  output.data <- data.frame(k = numeric(0),
+                            rep = numeric(0),
+                            Ndot_hat = numeric(0),
+                            Ndot_lcl = numeric(0),
+                            Ndot_ucl = numeric(0),
                             Ntime_hat = numeric(0),
+                            Ntime_lcl = numeric(0),
+                            Ntime_ucl = numeric(0),
+                            NHuggins_hat = numeric(0),
+                            NHuggins_lcl = numeric(0),
+                            NHuggins_ucl = numeric(0),
                             Bayes_Nmed_M0 = numeric(0),
+                            Bayes_Nse_M0 = numeric(0),
+                            Bayes_Nlcl_M0 = numeric(0),
+                            Bayes_Nucl_M0 = numeric(0),
                             Bayes_Nmed_Mt = numeric(0),
-                            Bayes_Nmed_Mh = numeric(0))
+                            Bayes_Nse_Mt = numeric(0),
+                            Bayes_Nlcl_Mt = numeric(0),
+                            Bayes_Nucl_Mt = numeric(0),
+                            Bayes_Nmed_Mh = numeric(0),
+                            Bayes_Nse_Mh = numeric(0),
+                            Bayes_Nlcl_Mh = numeric(0),
+                            Bayes_Nucl_Mh = numeric(0))
 
   sample.n.out <- matrix(nrow = n_sim_reps,
                          ncol = k)
@@ -73,7 +90,7 @@ sample_sim <- function(n_sim_reps,N,p,k,nz = 50,
                                                                length = n_sim_reps)
   r <- 1   # this helps when running line by line
   for(r in 1:n_sim_reps){
-    print(paste('Simulation', r, 'of', n_sim_reps))
+    print(paste('Simulation', r, 'of', n_sim_reps, '; p = ', p, ', k = ', k))
     #function to create capture histories from simulated data
     sim.out <- sim.data(N=N, p=p, k=k)
     data.out[[r]] <- sim.out$y.full
@@ -84,16 +101,18 @@ sample_sim <- function(n_sim_reps,N,p,k,nz = 50,
     M.dot <- mark(sim.out$capt.hist,
                   model = "Closed",
                   model.parameters = list(p = p.dot),
-                  silent = T,
+                  silent = F,
                   output = F,
-                  delete = T)
+                  delete = T,
+                  se = T)
 
     M.t <- mark(sim.out$capt.hist,
                 model = "Closed",
                 model.parameters = list(p = p.time),
-                silent = T,
+                silent = F,
                 output = F,
-                delete = T)
+                delete = T,
+                se = T)
 
     dp.Huggins <- process.data(data = sim.out$capt.hist,
                                model = 'Huggins')
@@ -102,9 +121,10 @@ sample_sim <- function(n_sim_reps,N,p,k,nz = 50,
     Mt.Huggins <- mark(data = dp.Huggins,
                        ddl = ddl.Huggins,
                        model.parameters = list(p = p.time),
-                       silent = T,
+                       silent = F,
                        output = F,
-                       delete = T)
+                       delete = T,
+                       se = T)
 
     #pull off just the estimate of N (you can select other parameters if you want)
     p.dot.hat <- get.real(M.dot, "p")
@@ -113,7 +133,7 @@ sample_sim <- function(n_sim_reps,N,p,k,nz = 50,
     p.dot.ucl<- M.dot[["results"]][["real"]][["ucl"]][1]
 
     N.dot.hat <- M.dot[["results"]][["derived"]][["N Population Size"]][["estimate"]]
-    N.dot.se <- M.dot[["results"]][["derived"]][["N Population Size"]][["se"]]
+    #N.dot.se <- M.dot[["results"]][["derived"]][["N Population Size"]][["se"]]
     N.dot.lcl <- M.dot[["results"]][["derived"]][["N Population Size"]][["lcl"]]
     N.dot.ucl <- M.dot[["results"]][["derived"]][["N Population Size"]][["ucl"]]
 
@@ -123,7 +143,7 @@ sample_sim <- function(n_sim_reps,N,p,k,nz = 50,
     p.time.ucl <- M.t[["results"]][["real"]][["ucl"]][1:k]
 
     N.time.hat <- M.t[["results"]][["derived"]][["N Population Size"]][["estimate"]]
-    N.time.se <-  M.t[["results"]][["derived"]][["N Population Size"]][["se"]]
+    #N.time.se <-  M.t[["results"]][["derived"]][["N Population Size"]][["se"]]
     N.time.lcl <-  M.t[["results"]][["derived"]][["N Population Size"]][["lcl"]]
     N.time.ucl <-  M.t[["results"]][["derived"]][["N Population Size"]][["ucl"]]
 
@@ -133,55 +153,79 @@ sample_sim <- function(n_sim_reps,N,p,k,nz = 50,
     p.Huggins.ucl <- Mt.Huggins[["results"]][["real"]][["ucl"]]
 
     N.Huggins.hat <- Mt.Huggins[["results"]][["derived"]][["N Population Size"]][["estimate"]]
-    N.Huggins.se <- Mt.Huggins[["results"]][["derived"]][["N Population Size"]][["se"]]
+    #N.Huggins.se <- Mt.Huggins[["results"]][["derived"]][["N Population Size"]][["se"]]
     N.Huggins.lcl <- Mt.Huggins[["results"]][["derived"]][["N Population Size"]][["lcl"]]
     N.Huggins.ucl <- Mt.Huggins[["results"]][["derived"]][["N Population Size"]][["ucl"]]
 
     # Run Bayesian analysis on the same data:
-    bayes.out.Mt <- estim_Bayes(sim.out$y.full,
-                                'Mt',
-                                params = c("N", "p", "Omega", "deviance"),
-                                nz = nz,
-                                n.chains = n.chains,
-                                n.adapt = n.adapt,
-                                n.update = n.update,
-                                n.iter = n.iter)
+    if (parallel){
+      print('Running Bayes Mh in parallel')
+      bayes.out.Mh <- estim_Bayes_parallel(sim.out$y.full,
+                                           'Mh',
+                                           params = c("N", "mean.p", "sd", "Omega", "deviance"),
+                                           nz = 100)
 
-    bayes.out.M0 <- estim_Bayes(sim.out$y.full,
-                                'M0',
-                                params = c("N", "p", "Omega", "deviance"),
-                                nz = nz,
-                                n.chains = n.chains,
-                                n.adapt = n.adapt,
-                                n.update = n.update,
-                                n.iter = n.iter)
+      print('Running Bayes Mt in parallel')
+      bayes.out.Mt <- estim_Bayes_parallel(sim.out$y.full,
+                                           'Mt',
+                                           params = c("N", "p", "Omega", "deviance"),
+                                           nz = nz)
+      print('Running Bayes M0 in parallel')
+      bayes.out.M0 <- estim_Bayes_parallel(sim.out$y.full,
+                                           'M0',
+                                           params = c("N", "p", "Omega", "deviance"),
+                                           nz = nz)
+    } else {
+      print('Running Bayes Mt')
+      bayes.out.Mt <- estim_Bayes(sim.out$y.full,
+                                  'Mt',
+                                  params = c("N", "p", "Omega", "deviance"),
+                                  nz = nz,
+                                  n.chains = n.chains,
+                                  n.adapt = n.adapt,
+                                  n.update = n.update,
+                                  n.iter = n.iter)
+      print('Running Bayes M0')
+      bayes.out.M0 <- estim_Bayes(sim.out$y.full,
+                                  'M0',
+                                  params = c("N", "p", "Omega", "deviance"),
+                                  nz = nz,
+                                  n.chains = n.chains,
+                                  n.adapt = n.adapt,
+                                  n.update = n.update,
+                                  n.iter = n.iter)
+      print('Running Bayes Mh')
+      bayes.out.Mh <- estim_Bayes(sim.out$y.full,
+                                  'Mh',
+                                  params = c("N", "mean.p", "sd", "Omega", "deviance"),
+                                  nz = 100,
+                                  n.chains = n.chains,
+                                  n.adapt = n.adapt * 3,
+                                  n.update = n.update,
+                                  n.iter = n.iter * 2)
 
-    bayes.out.Mh <- estim_Bayes(sim.out$y.full,
-                                'Mh',
-                                params = c("N", "mean.p", "sd", "Omega", "deviance"),
-                                nz = 100,
-                                n.chains = n.chains,
-                                n.adapt = n.adapt * 3,
-                                n.update = n.update,
-                                n.iter = n.iter * 2)
+    }
 
-    bayes.diag[[r]] <- c(bayes.out.M0$diag, bayes.out.Mt$diag, bayes.out.Mh$diag)
-    bayes.DIC[[r]] <- c(bayes.out.M0$DIC, bayes.out.Mt$DIC, bayes.out.Mh$DIC)
-    bayes.model[[r]] <- c(bayes.out.M0$model, bayes.out.Mt$model, bayes.out.Mh$model)
+    bayes.diag[[r]] <- c(bayes.out.M0$diag,
+                         bayes.out.Mt$diag,
+                         bayes.out.Mh$diag)
+    bayes.DIC[[r]] <- c(bayes.out.M0$DIC,
+                        bayes.out.Mt$DIC,
+                        bayes.out.Mh$DIC)
+    bayes.model[[r]] <- c(bayes.out.M0$model,
+                          bayes.out.Mt$model,
+                          bayes.out.Mh$model)
 
     #put in data frame
     new.data <- data.frame(k = k,
                            rep = r,
                            Ndot_hat = N.dot.hat,
-                           Ndot_se = N.dot.se,
                            Ndot_lcl = N.dot.lcl,
                            Ndot_ucl = N.dot.ucl,
                            Ntime_hat = N.time.hat,
-                           Ntime_se = N.time.se,
                            Ntime_lcl = N.time.lcl,
                            Ntime_ucl = N.time.ucl,
                            NHuggins_hat = N.Huggins.hat,
-                           NHuggins_se = N.Huggins.se,
                            NHuggins_lcl = N.Huggins.lcl,
                            NHuggins_ucl = N.Huggins.ucl,
                            Bayes_Nmed_M0 = bayes.out.M0$summary$quantiles['N', '50%'],
@@ -342,12 +386,8 @@ estim_Bayes <- function(y.full, modelName,
 estim_Bayes_parallel <- function(y.full,
                                  modelName,
                                  params = c("N", "p", "Omega", "deviance"),
-                                 nz = 50,
-                                 n.chains = 5,
-                                 n.adapt = 1000,
-                                 n.update = 5000,
-                                 n.iter = 10000){
-  # also use Bayesian model:
+                                 nz = 50){
+
   y.data <- y.full[rowSums(y.full) > 0,]
   yobs <- as.matrix(y.data)
   yaug <- rbind(yobs,
@@ -357,20 +397,16 @@ estim_Bayes_parallel <- function(y.full,
                     M = nrow(yaug),
                     T = ncol(yaug))
 
+  model.file <- paste0('models/Model_', modelName, '.txt')
   if (modelName == 'M0'){
-    inits <- function(yaug){
-      A <- list(z = rep(1, nrow(yaug)),
-                p = runif(1, 0, 1))
-      return(A)}
+    inits <- function() list(z = rep(1, nrow(yaug)),
+                             p = runif(1, 0, 1))
 
   } else if (modelName == 'Mt'){
-    inits <- function(yaug){
-      A <- list(z = rep(1, nrow(yaug)),
-                p = runif(ncol(yaug), 0, 1),
-                .RNG.name = "lecuyer::RngStream")
-      return(A)}
+    inits <- function() list(z = rep(1, nrow(yaug)),
+                             p = runif(ncol(y.full), 0, 1))
   } else if (modelName == 'Mb'){
-    inits <- function(yaug) list(z = rep(1, nrow(yaug)),
+    inits <- function() list(z = rep(1, nrow(yaug)),
                              p = runif(1, 0, 1))
   } else if (modelName == 'Mh'){
     # for model Mh, capture histories are converted into capture frequencies:
@@ -379,41 +415,28 @@ estim_Bayes_parallel <- function(y.full,
     bugs.data <- list(yaug = yaug,
                       M = length(yaug),
                       T = ncol(y.data))
-    inits <- function(yaug) list(z = rep(1, length(yaug)),
+    inits <- function() list(z = rep(1, length(yaug)),
                              mean.p = runif(1, 0, 1))
 
   } else if (modelName == 'Mth'){
-    inits <- function(yaug) list(z = rep(1, nrow(yaug)),
+    inits <- function() list(z = rep(1, nrow(yaug)),
                              mean.p = runif(ncol(yaug), 0, 1),
                              sd = runif(1, 0.1, 0.9))
   } else if (modelName == 'Mtbh'){
-    inits <- function(yaug) list(z = rep(1, nrow(yaug)),
-                                 mean.p = runif(ncol(yaug), 0, 1),
-                                 sd = runif(1, 0.1, 0.9))
+    inits <- function() list(z = rep(1, nrow(yaug)),
+                             mean.p = runif(ncol(yaug), 0, 1),
+                             sd = runif(1, 0.1, 0.9))
 
   }
 
-  model.file <- paste0('models/Model_', modelName, '.txt')
-
-  # jm <- jags.model(model.file,
-  #                  data = bugs.data,
-  #                  inits,
-  #                  n.chains = n.chains,
-  #                  n.adapt = n.adapt)
-  #
-  # #update(jm, n.iter = n.update)
-  #
-  # load.module("dic")
-  # zm <- coda.samples(jm,
-  #                    variable.names = params,
-  #                    n.iter = n.iter)
   jags.fit <- jags.parallel(data = bugs.data,
                             parameters.to.save = params,
                             model.file = model.file,
+                            inits = inits,
                             n.burnin = 10000,
-                            n.chains = n.chains,
-                            n.iter = n.iter,
-                            n.thin = 1,
+                            n.chains = 5,
+                            n.iter = 100000,
+                            n.thin = 2,
                             jags.module = c('dic', 'glm', 'lecuyer'))
 
   zm <- as.mcmc(jags.fit)
@@ -421,13 +444,6 @@ estim_Bayes_parallel <- function(y.full,
   g.diag <- gelman.diag(zm)
   h.diag <- heidel.diag(zm)
   r.diag <- raftery.diag(zm)
-
-  # dicOut <- dic.samples(jm,
-  #                       n.iter = n.iter,
-  #                       type = "pD")
-  # dicOut2 <- dic.samples(jm,
-  #                        n.iter = n.iter,
-  #                        type = "popt")
 
   sum_zm <- summary(zm)
   meanDev <- sum_zm$statistics[rownames(sum_zm$statistics) == "deviance",

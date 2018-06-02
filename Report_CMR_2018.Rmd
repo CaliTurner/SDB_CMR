@@ -15,6 +15,11 @@ library(RMark)
 library(rjags)
 #library(ggplot2)
 source('Cm_SDB_functions.R')
+
+save.fig <- TRUE
+# reporting period:
+begin.date <- '2017-05-01'
+end.date <- "2018-04-30"
 ```
 
 ## Introduction
@@ -24,7 +29,7 @@ The green turtles inhabiting San Diego Bay, California (32.6°N, 117.1°W), is a
 
 In a previous study, Eguchi et al. (2010) used the long-term dataset as mark-recapture data and estimated life-history parameters for the foraging aggregation.  They focused on abundance and survival rates because these parameters related directly to management decisions. The estimated annual survival rate was 0.861 (SE = 0.147, 95% CI = 0.356-0.986), whereas annual abundance ranged from 16 (SE = 6.3, 95% CI = 4-29) to 61 (SE = 13.2, 95% CI = 36-88) from December 1990 to March 2009, where the estimate for the most recent season (2008/2009) was 35 with its 95% CI 16-54. Because of the sparse samples, precisions of estimates were poor. 
 
-In this study, we focused on estimating abundance only by conducting a short-term intense capture effort so that we could assume that the survival rate of the foraging aggregation is 1.0 and no immigration and emigration was occurring.  
+In this study, we focused on estimating abundance only by conducting a short-term intense capture effort from 2 May 2017 to 6 July 2017 so that we could assume that the survival rate of the foraging aggregation is 1.0 and no immigration and emigration was occurring.  
 
 ## Methods
 # Sampling frequency determination
@@ -45,31 +50,154 @@ For the Bayesian approach, effects of time, behavior, and variability among indi
 All statistical analyses were conducted using the R Statistical Language (v.3.4.3; R core team 2017). The ML analyses were conducted using Mark (REF) through RMark (Laake et al. YR), whereas the Bayesian analysis was conducted using JAGS (Plummer YR) through rjags (REF) in R. 
 
 ## Results
-# Sampling frequency determination
-As expected, greater capture probabilities resulted in better estimates, more precise and accurate (Figures). For the range of capture probabilities considered (0.02-0.10), estimated abundances were not acceptable even with the number of capture occassions of 16 if capture probability was 0.02 (or on average 1.2 turtles per capture day). At capture probability = 0.06 (or on average 3.6 turtles per capture day), abundance estimates would be somewhat acceptable at sampling frequency of 14 or greater (Figure). Using the Huggins closed models improved the estimates, however. When the Baysian approach was used, the median estimates were negatively biased, although the estimates were precise (Figure). (RUN HUGGINS, CLOSED, AND BAYESIAN MODELS ON THE SAME DATA SETS WITH FIXED CAPTURE PROBABILITIES. MAKE A PLOT PER CAPTURE PROBABILITY WITH ALL ESTIMATES FOR AN EASY COMPARISON. FIVE PLOTS ALL TOGETHER.)  
 
-We determined that we needed to capture on average 4 turtles or more per capture day and at least 14 sampling days.  
+# Change in body size over time
+Because our capture-recapture data go back to 1990, body size of captured turtles in the reporting period (from ```r begin.date``` to ```r end.date```) was examined in the context of the entire dataset.  
+```{r recaptures, include=F, echo=F, message=F}
+dat.size <- read_csv(file = 'data/CMR2018_size_data_2018-06-01.csv') %>%
+  mutate(Date = as.Date(paste(Year_caught, 
+                              Month_caught, 
+                              Day_caught, sep = "-"),
+          format = "%Y-%m-%d", tz = "America/Los_Angeles")) %>%
+  mutate(SCL_cm = Str_Carapace_Length_cm,
+         SCW_cm = Str_Carapace_Width_cm,
+         CCL_cm = Cur_Carapace_Length_cm,
+         CCW_cm = Cur_Carapace_Width_cm,
+         Mass_kg = Weight_kg,
+         Turtle_ID = as.factor(Turtle_ID)) %>%
+  select(Date, Turtle_ID, Sex, Mass_kg, SCL_cm, SCW_cm, CCL_cm, CCW_cm ) %>%
+  filter(Date <= as.Date(end.date, format= "%Y-%m-%d"))
 
-# Field sampling
-```{r results1, include = F, echo = FALSE, message=FALSE}
+
+dat.size.old <- filter(dat.size, Date < as.Date(begin.date, format = "%Y-%m-%d"))
+dat.size.new <- filter(dat.size, Date >= as.Date(begin.date, format = "%Y-%m-%d"))
+
+p.SCL.change <- ggplot() +
+  geom_path(data = dat.size,
+            aes(x = Date, y = SCL_cm, group = Turtle_ID)) +
+  geom_point(data = dat.size.new,
+             aes(x = Date, y = SCL_cm),
+             color = "blue4") + 
+  geom_point(data = dat.size.old,
+             aes(x = Date, y = SCL_cm),
+             color = "gray48") + 
+  geom_rect(aes(xmin = as.Date(begin.date), xmax = as.Date(end.date),
+                ymin = 35, ymax = Inf),
+            alpha = 0.3) + 
+  labs(x = "", y = "SCL (cm)") + 
+  theme(legend.position = "none") + 
+  scale_x_date(date_breaks = "5 years", date_labels = "%Y") 
+
+#as.Date(c("1990-01-01", "1995-01-01", "2000-01-01", 
+#                                  "2005-01-01", "2010-01-01", "2015-01-01"),
+#                                format = "%Y-%m%d"))
+if (save.fig)
+  ggsave(plot = p.SCL.change,
+         dpi = 600,
+         height = 7,
+         units = 'in',
+         file = paste0('figures/SCL_change.png'))
+
+```
+
+Standard carapace length (SCL in cm) of captured turtles during the reporting period ranged from ```r min(dat.size.new$SCL_cm, na.rm = T)``` to ```r (max(dat.size.new$SCL_cm, na.rm = T))``` (mean = ```r signif(mean(dat.size.new$SCL_cm, na.rm = T), 4)```, SE = ```r signif(SE(dat.size.new$SCL_cm), 2)```, n = ```r length(!is.na(dat.size.new$SCL_cm))```), whereas for the entire dataset it was ```r min(dat.size$SCL_cm, na.rm = T)``` to ```r max(dat.size$SCL_cm, na.rm = T)``` (mean = ```r signif(mean(dat.size$SCL_cm, na.rm = T), 4)```, SE = ```r signif(SE(dat.size$SCL_cm), 2)```, n = ```r length(!is.na(dat.size$SCL_cm))```).
+
+```{r p.SCL_change, echo=FALSE, fig.cap=""}
+knitr::include_graphics("figures/SCL_change.png")
+``` 
+
+```{r Mass_change, echo=FALSE, include=FALSE, message=FALSE}
+p.Mass.change <- ggplot() +
+  geom_path(data = dat.size,
+            aes(x = Date, y = Mass_kg, group = Turtle_ID)) +
+  geom_point(data = dat.size.new,
+             aes(x = Date, y = Mass_kg),
+             color = "blue4") + 
+  geom_point(data = dat.size.old,
+             aes(x = Date, y = Mass_kg),
+             color = "gray48") + 
+  geom_rect(aes(xmin = as.Date(begin.date), xmax = as.Date(end.date),
+                ymin = 0, ymax = Inf),
+            alpha = 0.3) + 
+  labs(x = "", y = "Mass (kg)") + 
+  theme(legend.position = "none") + 
+  scale_x_date(date_breaks = "5 years", date_labels = "%Y") 
+
+
+#as.Date(c("1990-01-01", "1995-01-01", "2000-01-01", 
+#                                  "2005-01-01", "2010-01-01", "2015-01-01"),
+#                                format = "%Y-%m%d"))
+if (save.fig)
+  ggsave(plot = p.Mass.change,
+         dpi = 600,
+         height = 7,
+         units = 'in',
+         file = paste0('figures/Mass_change.png'))
+```
+
+Body mass (kg) of captured turtles during the reporting period ranged from ```r min(dat.size.new$Mass_kg, na.rm = T)``` to ```r (max(dat.size.new$Mass_kg, na.rm = T))``` (mean = ```r signif(mean(dat.size.new$Mass_kg, na.rm = T), 4)```, SE = ```r signif(SE(dat.size.new$Mass_kg), 2)```, n = ```r length(!is.na(dat.size.new$Mass_kg))```), whereas for the entire dataset it was ```r min(dat.size$Mass_kg, na.rm = T)``` to ```r max(dat.size$Mass_kg, na.rm = T)``` (mean = ```r signif(mean(dat.size$Mass_kg, na.rm = T), 4)```, SE = ```r signif(SE(dat.size$Mass_kg), 2)```, n = ```r length(!is.na(dat.size$Mass_kg))```).
+  
+```{r p.Mass_change, echo=FALSE, fig.cap=""}
+knitr::include_graphics("figures/Mass_change.png")
+``` 
+  
+
+```{r SCLvsMass, include = F, echo = FALSE, message=FALSE}
 
 # BRING IN SIZE DATA FOR THE SAMPLING. SCL, CCL, ETC.
 # this file was created using extract_data_TurtleDB.R. See the script for 
 # details - connect to the database using ODBC
-dat.size <- read_csv(file = 'data/CMR2017_size_data_2017-09-18.csv')
-# group the data by turtle ID - then extract the size information:
+
+p.MassVsSCL <- ggplot() +
+  geom_point(data = dat.size.old, 
+             aes(x = SCL_cm, y = Mass_kg),
+             color = 'gray') +
+  geom_point(data = dat.size.new,
+             aes(x = SCL_cm, y = Mass_kg),
+             color = 'blue') + 
+  geom_point(data = data.frame(SCL_cm = 40,
+                               Mass_kg = lb2kg(41)),
+             aes(x = SCL_cm, y = Mass_kg),
+             color = "red") + 
+  labs(x = "SCL (cm)", y = "Mass (kg)",
+       main = "")
+
+fit.MassVsSCL <- lm(log(Mass_kg) ~ SCL_cm, data = dat.size)
+sum.fit.MassVsSCL <- summary(fit.MassVsSCL)
+
+if (save.fig)
+  ggsave(plot = p.MassVsSCL,
+         dpi = 600,
+         height = 7,
+         units = 'in',
+         file = paste0('figures/Mass_SCL.png'))
+
+```
+
+
+The relationship between SCL and mass indicated that some mass measurements were recorded in lb rather than kg. There was a log-linear relationship between mass and SCL (ln(mass = ```r signif(fit.MassVsSCL$coefficients[1], 3)``` + ```r signif(fit.MassVsSCL$coefficients[2], 3)``` x SCL, R2 = ```r signif(sum.fit.MassVsSCL$r.squared, 3)```)). 
+
+  
+```{r p.MassVsSCL, echo=FALSE, fig.cap=""}
+knitr::include_graphics("figures/Mass_SCL.png")
+``` 
+
+# Abundance estimates 
+```{r abundance, echo=F, message=FALSE, include=FALSE}
 dat.size %>% group_by(Turtle_ID) %>% 
-  summarise(SCL = first(Str_Carapace_Length_cm),
-            SCW = first(Str_Carapace_Width_cm),
-            CCL = first(Cur_Carapace_Length_cm),
-            CCW = first(Cur_Carapace_Width_cm)) -> dat.size.by.ID
+  summarise(SCL = first(SCL_cm),
+            SCW = first(SCW_cm),
+            CCL = first(CCL_cm),
+            CCW = first(CCW_cm)) -> dat.size.by.ID
 
 # capture recapture data are here:  no capture on 6/12/2017
 dat0 <- read.csv(file = 'data/SDB_CMR_2017.csv')
 
 # remove the column for 2017-06-13 - no capture:
 # note no need for quotes in column names
-dat0 <- subset(dat0, select = -X2017.06.13)
+dat0 <- subset(dat0, select = -X2017.06.13) %>%
+  mutate(Turtle_ID = as.factor(Turtle_ID))
+
 dat0.size <- left_join(dat0, dat.size.by.ID, by='Turtle_ID')
 
 #capt.hist <- data.frame(ch = pasty(dat0[1:nrow(dat0), 2:ncol(dat0)]))
@@ -102,13 +230,7 @@ dat.net.summary <- dat.net %>%
 
 ```
 
-At least one turtle was caught on ```r length(n.turtles)``` days from 2 May 2017 to 6 July 2017, where daily effort ranged from ```r signif(min(dat.net.summary$TotalEffort, na.rm = T), digits = 4)``` to ```r signif(max(dat.net.summary$TotalEffort, na.rm = T), digits = 5)``` m hr of net (mean = ```r signif(mean(dat.net.summary$TotalEffort, na.rm = T), digits = 4)``` and SE = ```r signif(SE(dat.net.summary$TotalEffort), digits = 2)```.
-We caught a total of ```r sum(n.turtles)``` turtles (```r nrow(dat.size.by.ID)``` unique turtles). The maximum number of turtles caught per day was ```r max(n.turtles)``` (mean = ```r signif(mean(n.turtles), digits = 2)```, SE = ```r signif(SE(n.turtles), digits = 2)```).  The number of captures per turtle ranged from 1 to ```r max(n.captures)``` (mean = ```r signif(mean(n.captures), digits = 2)```, SE = ```r signif(SE(n.captures), digits = 2)```).  The CCL of these turtles ranged from ```r min(dat.size.by.ID$CCL)``` to ```r max(dat.size.by.ID$CCL)``` cm (mean = ```r signif(mean(dat.size.by.ID$CCL), digits = 3)```, SE = ```r signif(SE(dat.size.by.ID$CCL), digits = 2)```), whereas CCW ranged from ```r min(dat.size.by.ID$CCW)``` to ```r max(dat.size.by.ID$CCW)``` cm (mean = ```r signif(mean(dat.size.by.ID$CCW), digits = 3)```, SE = ```r signif(SE(dat.size.by.ID$CCW), digits = 2)```).  
-
-On six net deployments, exact locations of these nets were not recorded. Consequently, we were unable to determine the lengths of these nets. We, therefore, used the average net length of all deployments (```r signif(net.dist.mean, digits = 1)```) for these missing values. 
-
-# Statistical analysis
-Capture and non-capture of the ```r nrow(dat.size.by.ID)``` turtles during the study period were used to estimate the total abundance within the south SDB. We used the sampling effort (net hrs) and body size (CCL) as covariates that potentially affected the capture probabilities. CCL was used as a continuous variable or binary categorical variables, where the effect of cut off value was tested at 70, 80, and 90 cm. We used RMark (REF) in R Statistical Computing Environment to run Mark (REF) for the analysis. Closed and Huggins' closed models were used for the estimation process. 
+Capture and non-capture of the ```r nrow(dat.size.by.ID)``` turtles between during the study period were used to estimate the total abundance within the south SDB. We used the sampling effort (net hrs) and body size (CCL) as covariates that potentially affected the capture probabilities. CCL was used as a continuous variable or binary categorical variables, where the effect of cut off value was tested at 70, 80, and 90 cm. We used RMark (REF) in R Statistical Computing Environment to run Mark (REF) for the analysis. Closed and Huggins' closed models were used for the estimation process. 
 
 ```{r RMark_1, include = F, echo=F, message=F, cache=TRUE}
 # load results from the most recent run here:

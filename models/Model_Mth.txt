@@ -1,0 +1,33 @@
+# Closed model 1 from Kery and Schaub 2012. p. 155
+# Mth: additive (main) fixed time effect and random
+# logistic-normal effect of individuals
+
+model {
+  # priors
+  Omega ~ dunif(0, 1)
+
+  for (t in 1:T){
+    mean.p[t] ~ dunif(0, 1)
+    mean.lp[t] <- logit(mean.p[t])
+  }
+
+  sd ~ dunif(0.1, 0.9)
+  tau <- 1/(sd * sd)
+
+  # likelihood
+  for (i in 1:M){
+    z[i] ~ dbern(Omega)
+    eps[i] ~ dnorm(0, tau)
+    ind[i] ~ dinterval(eps[i], c(-16, 16))
+
+    for (t in 1:T){
+      lp[i,t] <- mean.lp[t] + eps[i] * ind[i]
+      p[i, t] <- 1/(1 + exp(-lp[i,t]))
+      p.eff[i,t] <- z[i] * p[i,t]
+      yaug[i,t] ~ dbern(p.eff[i,t])
+    }
+
+  }
+  N <- sum(z[])
+
+}
