@@ -96,8 +96,7 @@ if (save.fig)
          dpi = 600,
          height = 7,
          units = 'in',
-         file = paste0('figures/SCL_change.png'))
-
+         file = 'figures/SCL_change.png')
 ```
 
 Standard carapace length (SCL in cm) of captured turtles during the reporting period ranged from ```r min(dat.size.new$SCL_cm, na.rm = T)``` to ```r (max(dat.size.new$SCL_cm, na.rm = T))``` (mean = ```r signif(mean(dat.size.new$SCL_cm, na.rm = T), 4)```, SE = ```r signif(SE(dat.size.new$SCL_cm), 2)```, n = ```r length(!is.na(dat.size.new$SCL_cm))```), whereas for the entire dataset it was ```r min(dat.size$SCL_cm, na.rm = T)``` to ```r max(dat.size$SCL_cm, na.rm = T)``` (mean = ```r signif(mean(dat.size$SCL_cm, na.rm = T), 4)```, SE = ```r signif(SE(dat.size$SCL_cm), 2)```, n = ```r length(!is.na(dat.size$SCL_cm))```).
@@ -105,6 +104,9 @@ Standard carapace length (SCL in cm) of captured turtles during the reporting pe
 ```{r p.SCL_change, echo=FALSE, fig.cap=""}
 knitr::include_graphics("figures/SCL_change.png")
 ``` 
+  
+Figure 1. Changes in SCL (cm) of green turtles captured in San Diego Bay from 1990 to psresent. The current reporting period (```r begin.date``` - ```r end.date```) is shown as a shaded region. Those captured within the reporting period are shown in blue. 
+  
 
 ```{r Mass_change, echo=FALSE, include=FALSE, message=FALSE}
 p.Mass.change <- ggplot() +
@@ -141,7 +143,9 @@ Body mass (kg) of captured turtles during the reporting period ranged from ```r 
 knitr::include_graphics("figures/Mass_change.png")
 ``` 
   
+Figure 2. Changes in mass (kg) of green turtles captured in San Diego Bay from 1990 to psresent. The current reporting period (```r begin.date``` - ```r end.date```) is shown as a shaded region. Those captured within the reporting period are shown in blue. 
 
+  
 ```{r SCLvsMass, include = F, echo = FALSE, message=FALSE}
 
 # BRING IN SIZE DATA FOR THE SAMPLING. SCL, CCL, ETC.
@@ -172,6 +176,7 @@ if (save.fig)
          units = 'in',
          file = paste0('figures/Mass_SCL.png'))
 
+plot(p.MassVsSCL)
 ```
 
 
@@ -181,6 +186,9 @@ The relationship between SCL and mass indicated that some mass measurements were
 ```{r p.MassVsSCL, echo=FALSE, fig.cap=""}
 knitr::include_graphics("figures/Mass_SCL.png")
 ``` 
+  
+Figure 3. Relationship betweenb SCL and Mass. Blue points indicated data from this reporting period (```r begin.date``` - ```r end.date```).  The red point indicates the mass of the turtle converted to kilograms. 
+
 
 # Abundance estimates 
 ```{r abundance, echo=F, message=FALSE, include=FALSE}
