@@ -6,8 +6,8 @@
 
 sysInfo <- Sys.info()
 ifelse(sysInfo[1] == 'Linux',
-       source('~/Documents/R/TomosFunctions.R'),
-       source('~/R/TomosFunctions.R'))
+       source('~/Documents/R/tools/TomosFunctions.R'),
+       source('~/R/tools/TomosFunctions.R'))
 
 ##FIRST DEFINE SOME FUNCTIONS NEEDED
 ## FUNCTION TO CREATE CAPTURE HISTORY CHARACTER STRINGS

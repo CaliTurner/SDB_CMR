@@ -12,7 +12,7 @@ library('ggplot2')
 library('reshape2')
 library(tidyverse)
 
-save.plot <- T
+save.plot <- F
 
 RData.files <- c("RData/closed_simulation_p2_2017-12-12.RData",
                  "RData/closed_simulation_p4_2017-12-12.RData",
