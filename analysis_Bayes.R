@@ -8,6 +8,7 @@ rm(list=ls())
 #library(RMark)
 library(rjags)
 #library(R2jags)
+library(tidyverse)
 
 source('Cm_SDB_functions.R')
 
@@ -17,7 +18,8 @@ n.update <- 10000
 n.iter <- 50000
 nz <- 50 # the augmented additional rows of individuals
 
-dat0 <- read.csv(file = 'data/SDB_CMR_2017.csv')
+#dat0 <- read.csv(file = 'data/SDB_CMR_2017.csv')
+dat0 <- read.csv(file = 'data/SDB_CMR_2019.csv')
 
 y.full <- dat0[1:nrow(dat0), 2:ncol(dat0)]
 

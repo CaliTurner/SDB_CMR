@@ -1,0 +1,147 @@
+---
+title: "Abundance of green turtles in San Diego Bay 2017"
+author: "Tomo Eguchi"
+date: '`r Sys.Date()`'
+output: word_document
+---
+
+NEED TO GET UDPATED - NOT STARTED AS OF 2019-07-05
+
+
+```{r setup, include=FALSE, message=FALSE, echo=FALSE}
+#knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+library(tidyverse)
+library(lubridate)
+library(geosphere)
+library(RMark)
+library(rjags)
+#library(ggplot2)
+source('Cm_SDB_functions.R')
+```
+
+## Introduction
+Precise estimates of abundance and survival rates are of critical importance for evaluating the likelihood of population persistence via population viability analysis or for deriving management decisions, e.g., Marine Mammal Protection Act (1972, amended 2007).  These parameters are fundamental in modeling and for evaluating population persistence and resilience to anthropogenic mortalities.  For species with a wide spatial distribution, however, management decisions at the species level may not be effective due to the variability in the magnitude of each threat (e.g., habitat alteration and fisheries bycatch) at regional and local scales.  Further, these threats may variably impact the population segments occurring at these different spatial scales such that while some local or regional subpopulations may be stable or increasing over time, others may be decreasing.  Each of these subpopulations is a component of the respective ecosystem such that it should be monitored and managed, while considering how it may affect the entire biological population. This is further complicated for highly migratory species with complex life histories.  In the case of sea turtles, populations comprise breeding units tied to nesting habitat on tropical beaches which are linked to multiple foraging and developmental habitats, often spread out across ocean basins (Chaloupka et al. 2004, Bowen et al. 2005).  The degree of demographic connectivity between these various nesting, developmental and foraging populations may be unknown, requiring management of these population components at a local, smaller scale than the broader population level. 
+
+The green turtles inhabiting San Diego Bay, California (32.6°N, 117.1°W), is an example of a local resident foraging aggregation.  It is one of the northern most of several foraging aggregations inhabiting bays along the coast of Baja California and mainland Mexico (Koch et al. 2007, Senko et al. 2010). Preliminary results of genetic and satellite telemetry studies indicate that green turtles in San Diego Bay are primarily part of the Mexican breeding population of east Pacific green turtles.  Likely nesting sites of these turtles include the Revillagigedos Islands, Tres Maria Islands, and mainland Mexico (Figure 1, Dutton 2003, unpublished data; also see Dutton et al. 2008).  Although green turtles have been seen in San Diego Bay since the mid 1800s, consistent reports of sightings ceased after World War I and did not recommence until 1960s (Stinson 1984), which coincided with the opening of a power plant in 1960 that emits warm effluent water (Figure 1, Duke Energy South Bay, LLC 2004).  The effluent creates a thermally unique environment in the southern end of the bay where green turtles assemble during winter (McDonald et al. 1994, Stinson 1984).  This concentration of green turtles provides an exceptional study site where continuous tagging and capture-recapture studies have been conducted since the early 1990s. The power plant was decomissioned at the end of 2010 but the foraging aggregation  in the south bay persists.  
+
+In a previous study, Eguchi et al. (2010) used the long-term dataset as mark-recapture data and estimated life-history parameters for the foraging aggregation.  They focused on abundance and survival rates because these parameters related directly to management decisions. The estimated annual survival rate was 0.861 (SE = 0.147, 95% CI = 0.356-0.986), whereas annual abundance ranged from 16 (SE = 6.3, 95% CI = 4-29) to 61 (SE = 13.2, 95% CI = 36-88) from December 1990 to March 2009, where the estimate for the most recent season (2008/2009) was 35 with its 95% CI 16-54. Because of the sparse samples, precisions of estimates were poor. 
+
+In this study, we focused on estimating abundance only by conducting a short-term intense capture effort so that we could assume that the survival rate of the foraging aggregation is 1.0 and no immigration and emigration was occurring.  
+
+## Methods
+# Sampling frequency determination
+To determine the sufficient sampling effort to obtain a precise estimate of abundance of green turtles in SDB, a simulation analysis was conducted. The simulation analysis sampled a virtual population of a fixed size with a range of capture probabilities that were estimated in the previous study.  The simulated dataset, then, was analyzed to estimate abundance of the virtual population. Uncertainty of the estimated abundance (95% CI) was used to determine efficient sampling frequencies (the lowest number of sampling occasions with an acceptable 95% CI). 
+
+The abundance of the simulated population was 60, whereas occasion-specific capture probability was drawn from the uniform distribution between 0.02 and 0.1, using the results in Eguchi et al. (2010). Sampling frequency was varied from 6 to 16 with an increment of 2. Resulting capture histories of the 60 individuals were analyzed with closed population models using the maximum likelihood (ML) approach with Mark (REF) through RMark () and Bayesian capture mark recapture models (Kery and Schaub 2012) in R (v. 3.4.1; R Core team). For the ML approach, "closed" models where effects of time on capture probability were included.  For the Bayesian approach, effects of time and individuals were included.  The sampling simulation and analyses of the simulated data were repeated 500 times to obtain variability in the estimated abundance. 
+
+# Field sampling
+Green turtles were caught with entanglement nets (50-100m length × 8m depth, mesh size = 40 cm stretched).  The entanglement nets used in this study have been used to capture the smallest of post-pelagic juvenile turtles at other green turtle foraging areas in Mexico (SCL ≥ 35 cm; Seminoff et al. 2003) as well as in SDB in the past (SCL ≥ 44.0 cm; Eguchi et al. 2010).  We therefore assumed that all size classes of green turtles living in SDB would be caught by these nets.  Exact locations of nets were dictated by tidal height, which restricted access to some areas during a low tide.  All nets were deployed from Boston whalers (approximately 5 m in length) with a 75-hp or 25-hp outboard motor.  The distance of the nets from the shore ranged from approximately 10 to 100 m, whereas water depths ranged from <1 to 6 m. Deployment time and latitude and longitude coordinates of two ends and the center of each deployed net were determined using a Global Positioning System (GPS) on a mobile phone. Deployment time and locations were used to compute the sampling effort. 
+
+Capture effort was conducted during late afternoon and evening. Both boats remained near depoyed nets in order to maintain close attention to turtles and other animals that might be caught in the nets. Nets were checked at least every 45 minutes. When a turtle was found in a net, it was broght onboard, disentangled, and checked for existing tags (flipper and passive integrated transponder (PIT) tags).  If no tag was present, new tags were fitted.  Curved carapace length (CCL) were measured from the nuchal notch to the posterior-most portion of the rear marginal scutes, whereas curved carapace width (CCW) was measured at the widest part of the carapace using a fiberglass measuring tape. Turtles were kept onboard until all the nets were extracted to avoid recaptures of the same turtles within the night. 
+
+# Statistical analyses
+Capture-recapture data were fitted to several statistical models to estimate abundance. We used maximum likelihood (ML) and Bayesian approaches as it was done for the sampling frequency determination via simulations. All models include capture probabilities (p), which can be assumed constant (p.) or varying with time (p~t~).  For the ML approach, we considered "closed" and "Huggins' closed" models. The difference between the two groups of models is that models in the closed models explicitly include the number of unobserved turtles as a parameter (full likelihood), whereas those in Huggins' models do not (conditional likelihood). Huggins' approach, unlike the closed models, can accommodate individual covaraites.  We considered effects of time, effort, and body size (continuous or discrete categories) on capture probabilties. Models were compared within each group, i.e., closed or Huggins', using AIC. The most parsimonious model was used for abundance estimation. 
+
+For the Bayesian approach, effects of time, behavior, and variability among individuals (individual heterogeneity) on capture probability were considered.  For the individual heterogeneity model, we assumed the capature probability among individual was normally distributed in the logit scale, which was a common assumption for capture heterogeneity models (REF).  For all models, we used the data-augmentation approach of Royle and Dorazio (YR, or Royle YR, Kery and Schaub 2012).   We used vague priors for all parameters. We ran 5 independent chains of 5000 steps as a burn-in sample, which was followed by 50000 steps for posterior samples. These posterior samples were used to compute the parameter estimates.  Convergence of each run was determined using Gelman-Rubin statistic (Gelman et al. YR). The best estimates from two groups of the ML approach and the best estimate from the Bayesian approach were compared using the precisions of the estimates. We provide all estimates but use the most precise estimate (narrowest 95% confidence or credible interval) as our best estimate of abundance of green turtles in the south part of San Diego Bay during early summer of 2017.
+
+All statistical analyses were conducted using the R Statistical Language (v.3.4.3; R core team 2017). The ML analyses were conducted using Mark (REF) through RMark (Laake et al. YR), whereas the Bayesian analysis was conducted using JAGS (Plummer YR) through rjags (REF) in R. 
+
+## Results
+# Sampling frequency determination
+As expected, greater capture probabilities resulted in better estimates, more precise and accurate (Figures). For the range of capture probabilities considered (0.02-0.10), estimated abundances were not acceptable even with the number of capture occassions of 16 if capture probability was 0.02 (or on average 1.2 turtles per capture day). At capture probability = 0.06 (or on average 3.6 turtles per capture day), abundance estimates would be somewhat acceptable at sampling frequency of 14 or greater (Figure). Using the Huggins closed models improved the estimates, however. When the Baysian approach was used, the median estimates were negatively biased, although the estimates were precise (Figure). (RUN HUGGINS, CLOSED, AND BAYESIAN MODELS ON THE SAME DATA SETS WITH FIXED CAPTURE PROBABILITIES. MAKE A PLOT PER CAPTURE PROBABILITY WITH ALL ESTIMATES FOR AN EASY COMPARISON. FIVE PLOTS ALL TOGETHER.)  
+
+We determined that we needed to capture on average 4 turtles or more per capture day and at least 14 sampling days.  
+
+# Field sampling
+```{r results1, include = F, echo = FALSE, message=FALSE}
+
+# BRING IN SIZE DATA FOR THE SAMPLING. SCL, CCL, ETC.
+# this file was created using extract_data_TurtleDB.R. See the script for 
+# details - connect to the database using ODBC
+dat.size <- read_csv(file = 'data/CMR2017_size_data_2017-09-18.csv')
+# group the data by turtle ID - then extract the size information:
+dat.size %>% group_by(Turtle_ID) %>% 
+  summarise(SCL = first(Str_Carapace_Length_cm),
+            SCW = first(Str_Carapace_Width_cm),
+            CCL = first(Cur_Carapace_Length_cm),
+            CCW = first(Cur_Carapace_Width_cm)) -> dat.size.by.ID
+
+# capture recapture data are here:  no capture on 6/12/2017
+dat0 <- read.csv(file = 'data/SDB_CMR_2017.csv')
+
+# remove the column for 2017-06-13 - no capture:
+# note no need for quotes in column names
+dat0 <- subset(dat0, select = -X2017.06.13)
+dat0.size <- left_join(dat0, dat.size.by.ID, by='Turtle_ID')
+
+#capt.hist <- data.frame(ch = pasty(dat0[1:nrow(dat0), 2:ncol(dat0)]))
+n.turtles <- colSums(dat0[, 2:ncol(dat0)])
+n.captures <- rowSums(dat0[, 2:ncol(dat0)])
+
+# bring in the net data - created by Katie O'Laughlin for the tide project
+dat.net <- read_csv(file = 'data/Standardized Net Data.csv') %>%
+  mutate(., Date = with_tz(as.Date(Field_Date, format = '%m/%d/%Y'), 
+                                      'america/los_angeles')) %>%
+  filter(., Date >= as.Date('2017-05-02') & 
+           Date <= as.Date('2017-07-06')) %>%
+  mutate(., NetDist = distGeo(cbind(Net_Lon_End1, Net_Lat_End1), 
+                           cbind(Net_Lon_End2, Net_Lat_End2))) 
+
+net.dist.mean <- mean(dat.net$NetDist, na.rm = T)
+
+dat.net[is.na(dat.net$NetDist), 'NetDist'] <- mean(dat.net$NetDist, na.rm = T)
+
+dat.net %>% mutate(., NetHrs = difftime(Net_Retrieval_Time, 
+                              Net_Deployment_Time,
+                              units = 'hours')) %>%
+  mutate(., Effort = NetDist * as.numeric(NetHrs)) -> dat.net
+
+# total effort then remove June 13 - no capture:
+dat.net.summary <- dat.net %>%
+  group_by(., Date) %>%
+  summarise(., TotalEffort = sum(Effort)) %>%
+  filter(., Date != '2017-06-13')
+
+```
+
+At least one turtle was caught on ```r length(n.turtles)``` days from 2 May 2017 to 6 July 2017, where daily effort ranged from ```r signif(min(dat.net.summary$TotalEffort, na.rm = T), digits = 4)``` to ```r signif(max(dat.net.summary$TotalEffort, na.rm = T), digits = 5)``` m hr of net (mean = ```r signif(mean(dat.net.summary$TotalEffort, na.rm = T), digits = 4)``` and SE = ```r signif(SE(dat.net.summary$TotalEffort), digits = 2)```.
+We caught a total of ```r sum(n.turtles)``` turtles (```r nrow(dat.size.by.ID)``` unique turtles). The maximum number of turtles caught per day was ```r max(n.turtles)``` (mean = ```r signif(mean(n.turtles), digits = 2)```, SE = ```r signif(SE(n.turtles), digits = 2)```).  The number of captures per turtle ranged from 1 to ```r max(n.captures)``` (mean = ```r signif(mean(n.captures), digits = 2)```, SE = ```r signif(SE(n.captures), digits = 2)```).  The CCL of these turtles ranged from ```r min(dat.size.by.ID$CCL)``` to ```r max(dat.size.by.ID$CCL)``` cm (mean = ```r signif(mean(dat.size.by.ID$CCL), digits = 3)```, SE = ```r signif(SE(dat.size.by.ID$CCL), digits = 2)```), whereas CCW ranged from ```r min(dat.size.by.ID$CCW)``` to ```r max(dat.size.by.ID$CCW)``` cm (mean = ```r signif(mean(dat.size.by.ID$CCW), digits = 3)```, SE = ```r signif(SE(dat.size.by.ID$CCW), digits = 2)```).  
+
+On six net deployments, exact locations of these nets were not recorded. Consequently, we were unable to determine the lengths of these nets. We, therefore, used the average net length of all deployments (```r signif(net.dist.mean, digits = 1)```) for these missing values. 
+
+# Statistical analysis
+Capture and non-capture of the ```r nrow(dat.size.by.ID)``` turtles during the study period were used to estimate the total abundance within the south SDB. We used the sampling effort (net hrs) and body size (CCL) as covariates that potentially affected the capture probabilities. CCL was used as a continuous variable or binary categorical variables, where the effect of cut off value was tested at 70, 80, and 90 cm. We used RMark (REF) in R Statistical Computing Environment to run Mark (REF) for the analysis. Closed and Huggins' closed models were used for the estimation process. 
+
+```{r RMark_1, include = F, echo=F, message=F, cache=TRUE}
+# load results from the most recent run here:
+load('RData/Mark_Analysis_output_2017-09-20.RData')
+```
+
+GOODNESS OF FIT RESULTS HERE.
+
+Among the closed models compared, the simplest (pdot) was considered the most parsimonious model according to AICc values, although all three models were within deltaAIC < ```r max(model.list.closed$model.table$DeltaAICc)``` (Table 1). Estimated abundance from the model was ```r ceiling(Nhat.closed[[1]]$estimate)``` (SE = ```r signif(Nhat.closed[[1]]$se, digits = 3)```) and its 95% CI was ```r signif(Nhat.closed[[1]]$lcl, digits = 3)``` - ```r signif(Nhat.closed[[1]]$ucl, digits = 3)```. Abundance estimates from all models were similar (Table 1).  For the Huggins' models, the model with a covariate of size classes separated by 80 cm was the most parsimonious model.  The top 5 models, however, were within deltaAIC < ```r signif(max(model.list.Huggins$model.table$DeltaAICc), digits = 2)```, indicating not much difference among the models. The estimated abundance from the most parsimonious Huggins' model was ```r signif(Nhat.Huggins[[1]]$estimate, digits = 3)``` (SE = ```r signif(Nhat.Huggins[[1]]$se, digits = 3)```) with its 95% CI ```r signif(Nhat.Huggins[[1]]$lcl, digits = 3)``` - ```r signif(Nhat.Huggins[[1]]$ucl, digits = 3)```. As it was the case for the closed models, abundance estimates from the Huggins' models were also similar as well as with closed model sets (Table 1).  Standard error of the estimated abundance was less for the closed model than Huggins' model. 
+
+```{r Bayes_1, include = F, echo=F, message=F, cache=TRUE}
+# rather than running the whole thing, load the results from the most recent run:
+load('RData/Bayes_Analysis_output_2017-12-13.RData')
+```
+
+For the Bayesian approach, the individual random effects model (Mh) was the best model according to the deviance information criteria (DIC; Table 2). The estimated abundance (mean) was ```r signif(Bayes.results.table[1, 'N'], digits = 3)``` with its 95% PI ```r Bayes.results.table[1, 'N_lcl']``` - ```r Bayes.results.table[1, 'N_ucl']```.  
+
+Regardless of the estimation methods (Maximum likelihood or Bayesian) or model variations, the estimated abundance was 40-60. 
+
+```{r Bayes_2, include = F, echo=F, message=F, cache=TRUE}
+#Mh.samples <- runjags::combine.mcmc(bayes.out.Mh$sample)
+Mh.samples.df <- as.data.frame(bayes.out.Mh$sample)
+
+p.1 <- ggplot(data = Mh.samples.df) + 
+  geom_density(aes(N), size = 1.5)
+
+p.1
+```
+
+## Discussion
+In the previous study, Eguchi et al. (2010) used a 20-yr time series of capture-recapture data, which were not necessarily collected to estimate abundance. Consequently, the estimates were imprecise. In this study, we designed a study for the purpose of obtaining a precise estimate of abundance of green turtles in south San Diego Bay. The most precise estimate using the maximum likelihood approach was ```r signif(Nhat.closed[[1]]$estimate, digits = 1)``` (SE = ```r signif(Nhat.closed[[1]]$se, digits = 2)```), whereas that using the Bayesian approach was ```r signif(Bayes.results.table[1, 'N'], digits = 1)``` (SE = ```r signif(bayes.out.Mh$summary$statistics['N', 'SD'], digits = 2)```). Based on these estimates, we concluded that there were approximately 50 green turtles resided in San Diego Bay during early summer 2017. This point estimate is similar to those in Eguchi et al. (2010), where estimated abundance between 1990 and 2009 ranged from 16 (2000/2001 season) to 61 (2002/2003 season).  The precision of the estimates from the current analyses were better than those in the previous study, where CVs and 95% PIs were... (NOT ALWAYS THOUGH...)
+
+
