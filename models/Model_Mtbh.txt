@@ -1,0 +1,38 @@
+# Closed model 1 from Kery and Schaub 2012. p. 158
+# Mtbh
+
+model {
+   # priors
+  Omega ~ dunif(0, 1)
+  for (j in 1:T){
+    alpha[j] <- log(mean.p[j] / (1 - mean.p[j]))
+    mean.p[j] ~ dunif(0, 1)  # detection intercepts
+  }
+
+  gamma ~ dnorm(0, 0.01)
+  tau <- 1/(sd * sd)
+  sd ~ dunif(0, 3)
+
+  # likelihood
+  for (i in 1:M){
+    z[i] ~ dbern(Omega)
+    eps[i] ~ dnorm(0, tau)
+    ind[i] ~ dinterval(eps[i], c(-16, 16))
+
+    # first occasion: no term for recapture
+    yaug[i, 1] ~ dbern(p.eff[i,1])
+    p.eff[i,1] <- z[i] * p[i, 1]
+    p[i,1] <- 1/(1 + exp(-lp[i,1]))
+    lp[i,1] <- alpha[1] + eps[i] * ind[i]
+
+    # all subsequent occasions: includes recapture term
+    for (j in 2:T){
+      yaug[i, j] ~ dbern(p.eff[i,j])
+      p.eff[i, j] <- z[i] * p[i,j]
+      p[i,j] <- 1/(1 + exp(-lp[i,j]))
+      lp[i,j] <- alpha[j] + eps[i]*ind[i] + gamma * yaug[i, (j-1)]
+    }
+  }
+
+  N <- sum(z[])
+}

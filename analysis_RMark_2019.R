@@ -8,61 +8,48 @@ rm(list=ls())
 library(RMark)
 library(tidyverse)
 library(lubridate)
-library(geosphere)
+#library(geosphere)
 
 source('Cm_SDB_functions.R')
-dat0 <- read.csv(file = 'data/SDB_CMR_2017.csv')
+#dat0 <- read.csv(file = 'data/SDB_CMR_2019.csv')
 
-# remove the column for 2017-06-13 - no capture:
-# note no need for quotes in column names
-dat0 <- subset(dat0, select = -X2017.06.13)
-
-# The input file for this was created by extract_data_TurtleDB.R
+# The input file for this was created by extract_data_TurtleDB_2019.R
 # which access the turtle database, extracts data for the CMR study,
 # saves into a .csv file.
-dat.size <- read_csv(file = 'data/CMR2017_size_data_2019-07-08.csv')
+dat.size <- read_csv(file = 'data/CMR2019_size_data_2019-09-23.csv')
 
-# group the data by turtle ID - then extract the size information:
-dat.size %>% group_by(Turtle_ID) %>%
-  summarise(SCL = first(Str_Carapace_Length_cm),
-            SCW = first(Str_Carapace_Width_cm),
-            CCL = first(Cur_Carapace_Length_cm),
-            CCW = first(Cur_Carapace_Width_cm)) -> dat.size.by.ID
-
-# combine the size information to the capture history so
-# I can use size as an individual covariate
-dat0.size <- left_join(dat0, dat.size.by.ID, by='Turtle_ID')
-
+CH <- select(dat.size, -c("ID", "CCL_cm"))
 # extract the capture history portion:
-capt.hist <- data.frame(ch = pasty(dat0[1:nrow(dat0), 2:ncol(dat0)]))
+capt.hist <- data.frame(ch = pasty(CH))
 
-# effort data:
+# effort data:  not entered into databaes as of 2019-09-23 so removing it
 # bring in the net data - created by Katie O'Laughlin for the tide project
-dat.net <- read_csv(file = 'data/Standardized Net Data.csv') %>%
-  mutate(., Date = with_tz(as.Date(Field_Date, format = '%m/%d/%Y'),
-                           'america/los_angeles')) %>%
-  filter(., Date >= as.Date('2017-05-02') &
-           Date <= as.Date('2017-07-06')) %>%
-  mutate(., NetDist = distGeo(cbind(Net_Lon_End1, Net_Lat_End1),
-                              cbind(Net_Lon_End2, Net_Lat_End2)))
+# dat.net <- read_csv(file = 'data/Standardized Net Data.csv') %>%
+#   mutate(., Date = with_tz(as.Date(Field_Date, format = '%m/%d/%Y'),
+#                            'america/los_angeles')) %>%
+#   filter(., Date >= as.Date('2017-05-02') &
+#            Date <= as.Date('2017-07-06')) %>%
+#   mutate(., NetDist = distGeo(cbind(Net_Lon_End1, Net_Lat_End1),
+#                               cbind(Net_Lon_End2, Net_Lat_End2)))
+# 
+# # missing values are filled in with the average of others
+# dat.net[is.na(dat.net$NetDist), 'NetDist'] <- mean(dat.net$NetDist, na.rm = T)
+# 
+# # Compute the number of net deployment hours, multiply by lengths
+# # to get the total effort:
+# dat.net %>% mutate(., NetHrs = difftime(Net_Retrieval_Time,
+#                                         Net_Deployment_Time,
+#                                         units = 'hours')) %>%
+#   mutate(., Effort = NetDist * as.numeric(NetHrs)) -> dat.net
+# 
+# # total effort per day then remove June 13 - no capture:
+# dat.net.summary <- dat.net %>%
+#   group_by(., Date) %>%
+#   summarise(., TotalEffort = sum(Effort)) %>%
+#   filter(., Date != '2017-06-13')
+# 
+# effort.1000 <- dat.net.summary$TotalEffort/1000
 
-# missing values are filled in with the average of others
-dat.net[is.na(dat.net$NetDist), 'NetDist'] <- mean(dat.net$NetDist, na.rm = T)
-
-# Compute the number of net deployment hours, multiply by lengths
-# to get the total effort:
-dat.net %>% mutate(., NetHrs = difftime(Net_Retrieval_Time,
-                                        Net_Deployment_Time,
-                                        units = 'hours')) %>%
-  mutate(., Effort = NetDist * as.numeric(NetHrs)) -> dat.net
-
-# total effort per day then remove June 13 - no capture:
-dat.net.summary <- dat.net %>%
-  group_by(., Date) %>%
-  summarise(., TotalEffort = sum(Effort)) %>%
-  filter(., Date != '2017-06-13')
-
-effort.1000 <- dat.net.summary$TotalEffort/1000
 # CMR analyses start here. Closed models can't have individual covaraites
 
 # set up models:
@@ -70,7 +57,7 @@ effort.1000 <- dat.net.summary$TotalEffort/1000
 # defined first.
 time <- list(formula = ~ time, share=TRUE)
 dot <- list(formula = ~ 1, share = TRUE)
-effort <- list(formula = ~ effort, share = TRUE)
+#effort <- list(formula = ~ effort, share = TRUE)
 #Time <- list(formula = ~ Time, share = TRUE)
 
 # closed model
@@ -78,16 +65,16 @@ dp.closed <- process.data(data = capt.hist,
                           model = 'Closed')
 
 ddl.closed <- make.design.data(dp.closed)
-ddl.closed$p$effort <- 0
-ddl.closed$p$effort <- effort.1000
-
-ddl.closed$c$effort <- 0
-ddl.closed$c$effort <- effort.1000[2:length(effort.1000)]
+# ddl.closed$p$effort <- 0
+# ddl.closed$p$effort <- effort.1000
+# 
+# ddl.closed$c$effort <- 0
+# ddl.closed$c$effort <- effort.1000[2:length(effort.1000)]
 
 # capture probability
 p.dot <- dot
 p.time <- time
-p.effort <- effort
+#p.effort <- effort
 
 f0.dot <- dot  # # never caught
 
@@ -99,7 +86,7 @@ model.list.closed <- mark.wrapper(models.closed,
                                   silent = F)
 
 # do the median c-hat stuff here:
-#export.chdata(dp.closed, filename = 'data/closed_data')
+export.chdata(dp.closed, filename = 'data/closed_data', replace = T)
 
 # Fletcher's c-hat looks okay.
 
@@ -137,10 +124,10 @@ Nhat.closed <- eval(parse(text = paste0('model.list.closed$',
 dp.Huggins <- process.data(data = capt.hist,
                            model = 'Huggins')
 
-dp.Huggins$data$size <- dat0.size$CCL
-dp.Huggins$data$size_cat1 <- ifelse(dat0.size$CCL > 90, 1, 0)
-dp.Huggins$data$size_cat2 <- ifelse(dat0.size$CCL > 80, 1, 0)
-dp.Huggins$data$size_cat3 <- ifelse(dat0.size$CCL > 70, 1, 0)
+dp.Huggins$data$size <- dat.size$CCL_cm
+dp.Huggins$data$size_cat1 <- ifelse(dat.size$CCL_cm > 90, 1, 0)
+dp.Huggins$data$size_cat2 <- ifelse(dat.size$CCL_cm > 80, 1, 0)
+dp.Huggins$data$size_cat3 <- ifelse(dat.size$CCL_cm > 70, 1, 0)
 
 size <- list(formula = ~size, share = TRUE)
 size_cat1 <- list(formula = ~ size_cat1, share = TRUE)
@@ -148,16 +135,16 @@ size_cat2 <- list(formula = ~ size_cat2, share = TRUE)
 size_cat3 <- list(formula = ~ size_cat3, share = TRUE)
 
 ddl.Huggins <- make.design.data(dp.Huggins)
-ddl.Huggins$p$effort <- 0
-ddl.Huggins$p$effort <- effort.1000
+#ddl.Huggins$p$effort <- 0
+#ddl.Huggins$p$effort <- effort.1000
 
-ddl.Huggins$c$effort <- 0
-ddl.Huggins$c$effort <- effort.1000[2:length(effort.1000)]
+#ddl.Huggins$c$effort <- 0
+#ddl.Huggins$c$effort <- effort.1000[2:length(effort.1000)]
 
 # capture probability
 p.dot <- dot
 p.time <- time
-p.effort <- effort
+#p.effort <- effort
 p.size <- size
 p.size_cat1 <- size_cat1
 p.size_cat2 <- size_cat2

@@ -1,0 +1,27 @@
+# Closed model 1 from Kery and Schaub 2012. p. 152
+# Mh
+
+model {
+  # priors
+  Omega ~ dunif(0, 1)
+  mean.p ~ dunif(0, 1)
+  sd ~ dunif(0, 5)
+
+  mean.lp <- logit(mean.p)
+  tau <- 1/(sd * sd)
+
+
+  # likelihood
+  for (i in 1:M){
+    z[i] ~ dbern(Omega)
+    logit(p[i]) <- eps[i] * ind[i]
+    eps[i] ~ dnorm(mean.lp, tau)
+    ind[i] ~ dinterval(eps[i], c(-16, 16))
+
+    p.eff[i] <- z[i] * p[i]
+    yaug[i] ~ dbin(p.eff[i], T)
+
+  }
+  N <- sum(z[])
+
+}

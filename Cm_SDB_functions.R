@@ -4,10 +4,10 @@
 # 27 January 2017
 # Tomo Eguchi
 
-sysInfo <- Sys.info()
-ifelse(sysInfo[1] == 'Linux',
-       source('~/Documents/R/tools/TomosFunctions.R'),
-       source('~/R/tools/TomosFunctions.R'))
+# sysInfo <- Sys.info()
+# ifelse(sysInfo[1] == 'Linux',
+#        source('~/Documents/R/tools/TomosFunctions.R'),
+#        source('~/R/tools/TomosFunctions.R'))
 
 ##FIRST DEFINE SOME FUNCTIONS NEEDED
 ## FUNCTION TO CREATE CAPTURE HISTORY CHARACTER STRINGS
@@ -294,18 +294,19 @@ estim_RMark_Closed <- function(cap.hist, model.parameters){
   return(output)
 }
 
+# Updated to use jagsUI with parallel computation 2019-09-23
 estim_Bayes <- function(y.full, modelName,
                         params = c("N", "p", "Omega", "deviance"),
                         nz = 50,
-                        n.chains = 5, n.adapt = 1000,
-                        n.update = 5000, n.iter = 10000){
+                        n.chains = 5, n.burnin = 5000,
+                        n.thin = 5, n.iter = 10000){
   # also use Bayesian model:
   y.data <- y.full[rowSums(y.full) > 0,]
   yobs <- as.matrix(y.data)
   yaug <- rbind(yobs,
                 array(0, dim = c(nz, dim(yobs)[2])))
 
-  bugs.data <- list(yaug = yaug,
+  jags.data <- list(yaug = yaug,
                     M = nrow(yaug),
                     T = ncol(yaug))
 
@@ -342,22 +343,31 @@ estim_Bayes <- function(y.full, modelName,
 
   model.file <- paste0('models/Model_', modelName, '.txt')
 
-  jm <- jags.model(model.file,
-                   data = bugs.data,
-                   inits,
-                   n.chains = n.chains,
-                   n.adapt = n.adapt)
-
+  #jm <- jags.model(model.file,
+  #                 data = bugs.data,
+  #                 inits,
+  #                 n.chains = n.chains,
+  #                 n.adapt = n.adapt)
+  jm <- jags(data = jags.data,
+             #inits = inits,
+             parameters.to.save= params,
+             model.file = model.file,
+             n.chains = n.chains,
+             n.burnin = n.burnin,
+             n.thin = n.thin,
+             n.iter = n.iter,
+             DIC = T, 
+             parallel=T)
   #update(jm, n.iter = n.update)
 
-  load.module("dic")
-  zm <- coda.samples(jm,
-                     variable.names = params,
-                     n.iter = n.iter)
+  #load.module("dic")
+  #zm <- coda.samples(jm,
+  #                   variable.names = params,
+  #                   n.iter = n.iter)
 
-  g.diag <- gelman.diag(zm)
-  h.diag <- heidel.diag(zm)
-  r.diag <- raftery.diag(zm)
+  #g.diag <- gelman.diag(zm)
+  #h.diag <- heidel.diag(zm)
+  #r.diag <- raftery.diag(zm)
 
   # dicOut <- dic.samples(jm,
   #                       n.iter = n.iter,
@@ -366,19 +376,22 @@ estim_Bayes <- function(y.full, modelName,
   #                        n.iter = n.iter,
   #                        type = "popt")
 
-  sum_zm <- summary(zm)
-  meanDev <- sum_zm$statistics[rownames(sum_zm$statistics) == "deviance",
-                               colnames(sum_zm$statistics) == "Mean"]
-  sdDev <- sum_zm$statistics[rownames(sum_zm$statistics) == "deviance",
-                             colnames(sum_zm$statistics) == "SD"]
-  DIC <- 0.5*(sdDev^2) + meanDev
-  out <- list(diag = list(g.diag = g.diag,
-                          h.diag = h.diag,
-                          r.diag = h.diag),
-              summary = sum_zm,
-              DIC = DIC,
-              model = model.file,
-              sample = runjags::combine.mcmc(zm))
+  #sum_zm <- summary(zm)
+  #meanDev <- sum_zm$statistics[rownames(sum_zm$statistics) == "deviance",
+  #                             colnames(sum_zm$statistics) == "Mean"]
+  #sdDev <- sum_zm$statistics[rownames(sum_zm$statistics) == "deviance",
+  #                           colnames(sum_zm$statistics) == "SD"]
+  #DIC <- 0.5*(sdDev^2) + meanDev
+  out <- list(jags.out = jm,
+                   jags.data = .data)
+
+  #out <- list(diag = list(g.diag = g.diag,
+  #                        h.diag = h.diag,
+  #                        r.diag = h.diag),
+  #            summary = sum_zm,
+  #            DIC = DIC,
+  #            model = model.file,
+  #            sample = runjags::combine.mcmc(zm))
   return(out)
 
 }

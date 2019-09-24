@@ -6,9 +6,10 @@
 
 rm(list=ls())
 #library(RMark)
-library(rjags)
+#library(rjags)
 #library(R2jags)
 library(tidyverse)
+library(jagsUI)
 
 source('Cm_SDB_functions.R')
 
@@ -19,9 +20,10 @@ n.iter <- 50000
 nz <- 50 # the augmented additional rows of individuals
 
 #dat0 <- read.csv(file = 'data/SDB_CMR_2017.csv')
-dat0 <- read.csv(file = 'data/SDB_CMR_2019.csv')
+dat0 <- read.csv(file = "data/CMR2019_size_data_2019-09-23.csv")
+y.full <- select(dat0, -c("ID", "CCL_cm"))
 
-y.full <- dat0[1:nrow(dat0), 2:ncol(dat0)]
+#y.full <- dat0[1:nrow(dat0), 2:ncol(dat0)]
 
 bayes.out.M0 <- estim_Bayes(y.full,
                             'M0',

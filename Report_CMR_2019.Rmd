@@ -15,9 +15,12 @@ library(tidyverse)
 library(lubridate)
 library(geosphere)
 library(RMark)
-library(rjags)
+library(jagsUI)
+#library(rjags)
 #library(ggplot2)
 source('Cm_SDB_functions.R')
+
+SE <- function(x) sqrt(var(x, na.rm = TRUE)/sum(!is.na(x)))
 ```
 
 ## Introduction
@@ -59,63 +62,27 @@ We determined that we needed to capture on average 4 turtles or more per capture
 # BRING IN SIZE DATA FOR THE SAMPLING. SCL, CCL, ETC.
 # this file was created using extract_data_TurtleDB.R. See the script for 
 # details - connect to the database using ODBC
-dat.size <- read_csv(file = 'data/CMR2017_size_data_2017-09-18.csv')
-# group the data by turtle ID - then extract the size information:
-dat.size %>% group_by(Turtle_ID) %>% 
-  summarise(SCL = first(Str_Carapace_Length_cm),
-            SCW = first(Str_Carapace_Width_cm),
-            CCL = first(Cur_Carapace_Length_cm),
-            CCW = first(Cur_Carapace_Width_cm)) -> dat.size.by.ID
+dat.size <- read_csv(file = 'data/CMR2019_size_data_2019-09-23.csv')
 
-# capture recapture data are here:  no capture on 6/12/2017
-dat0 <- read.csv(file = 'data/SDB_CMR_2017.csv')
+CH <- select(dat.size, -c("ID", "CCL_cm"))
 
-# remove the column for 2017-06-13 - no capture:
-# note no need for quotes in column names
-dat0 <- subset(dat0, select = -X2017.06.13)
-dat0.size <- left_join(dat0, dat.size.by.ID, by='Turtle_ID')
+#capt.hist <- data.frame(ch = pasty(CH))
 
-#capt.hist <- data.frame(ch = pasty(dat0[1:nrow(dat0), 2:ncol(dat0)]))
-n.turtles <- colSums(dat0[, 2:ncol(dat0)])
-n.captures <- rowSums(dat0[, 2:ncol(dat0)])
-
-# bring in the net data - created by Katie O'Laughlin for the tide project
-dat.net <- read_csv(file = 'data/Standardized Net Data.csv') %>%
-  mutate(., Date = with_tz(as.Date(Field_Date, format = '%m/%d/%Y'), 
-                                      'america/los_angeles')) %>%
-  filter(., Date >= as.Date('2017-05-02') & 
-           Date <= as.Date('2017-07-06')) %>%
-  mutate(., NetDist = distGeo(cbind(Net_Lon_End1, Net_Lat_End1), 
-                           cbind(Net_Lon_End2, Net_Lat_End2))) 
-
-net.dist.mean <- mean(dat.net$NetDist, na.rm = T)
-
-dat.net[is.na(dat.net$NetDist), 'NetDist'] <- mean(dat.net$NetDist, na.rm = T)
-
-dat.net %>% mutate(., NetHrs = difftime(Net_Retrieval_Time, 
-                              Net_Deployment_Time,
-                              units = 'hours')) %>%
-  mutate(., Effort = NetDist * as.numeric(NetHrs)) -> dat.net
-
-# total effort then remove June 13 - no capture:
-dat.net.summary <- dat.net %>%
-  group_by(., Date) %>%
-  summarise(., TotalEffort = sum(Effort)) %>%
-  filter(., Date != '2017-06-13')
+n.turtles <- nrow(dat.size) #colSums(dat0[, 2:ncol(dat0)])
+n.captures <- rowSums(CH)
 
 ```
 
-At least one turtle was caught on ```r length(n.turtles)``` days from 2 May 2017 to 6 July 2017, where daily effort ranged from ```r signif(min(dat.net.summary$TotalEffort, na.rm = T), digits = 4)``` to ```r signif(max(dat.net.summary$TotalEffort, na.rm = T), digits = 5)``` m hr of net (mean = ```r signif(mean(dat.net.summary$TotalEffort, na.rm = T), digits = 4)``` and SE = ```r signif(SE(dat.net.summary$TotalEffort), digits = 2)```.
-We caught a total of ```r sum(n.turtles)``` turtles (```r nrow(dat.size.by.ID)``` unique turtles). The maximum number of turtles caught per day was ```r max(n.turtles)``` (mean = ```r signif(mean(n.turtles), digits = 2)```, SE = ```r signif(SE(n.turtles), digits = 2)```).  The number of captures per turtle ranged from 1 to ```r max(n.captures)``` (mean = ```r signif(mean(n.captures), digits = 2)```, SE = ```r signif(SE(n.captures), digits = 2)```).  The CCL of these turtles ranged from ```r min(dat.size.by.ID$CCL)``` to ```r max(dat.size.by.ID$CCL)``` cm (mean = ```r signif(mean(dat.size.by.ID$CCL), digits = 3)```, SE = ```r signif(SE(dat.size.by.ID$CCL), digits = 2)```), whereas CCW ranged from ```r min(dat.size.by.ID$CCW)``` to ```r max(dat.size.by.ID$CCW)``` cm (mean = ```r signif(mean(dat.size.by.ID$CCW), digits = 3)```, SE = ```r signif(SE(dat.size.by.ID$CCW), digits = 2)```).  
+At least one turtle was caught on ```r length(n.turtles)``` days from 7 May 2019 to 26 June 2019.
+We caught a total of ```r sum(n.turtles)``` turtles (```r nrow(dat.size)``` unique turtles). The maximum number of turtles caught per day was ```r max(n.turtles)``` (mean = ```r signif(mean(n.turtles), digits = 2)```, SE = ```r signif(SE(n.turtles), digits = 2)```).  The number of captures per turtle ranged from 1 to ```r max(n.captures)``` (mean = ```r signif(mean(n.captures), digits = 2)```, SE = ```r signif(SE(n.captures), digits = 2)```).  The CCL of these turtles ranged from ```r min(dat.size$CCL_cm)``` to ```r max(dat.size$CCL_cm)``` cm (mean = ```r signif(mean(dat.size$CCL_cm), digits = 3)```, SE = ```r signif(SE(dat.size$CCL_cm), digits = 2)```).  
 
-On six net deployments, exact locations of these nets were not recorded. Consequently, we were unable to determine the lengths of these nets. We, therefore, used the average net length of all deployments (```r signif(net.dist.mean, digits = 1)```) for these missing values. 
 
 # Statistical analysis
-Capture and non-capture of the ```r nrow(dat.size.by.ID)``` turtles during the study period were used to estimate the total abundance within the south SDB. We used the sampling effort (net hrs) and body size (CCL) as covariates that potentially affected the capture probabilities. CCL was used as a continuous variable or binary categorical variables, where the effect of cut off value was tested at 70, 80, and 90 cm. We used RMark (REF) in R Statistical Computing Environment to run Mark (REF) for the analysis. Closed and Huggins' closed models were used for the estimation process. 
+Capture and non-capture of the ```r nrow(dat.size)``` turtles during the study period were used to estimate the total abundance within the south SDB. We used body size (CCL) as a covariate that potentially affected the capture probabilities. CCL was used as a continuous variable or binary categorical variables, where the effect of cut off value was tested at 70, 80, and 90 cm. We used RMark (REF) in R Statistical Computing Environment to run Mark (REF) for the analysis. Closed and Huggins' closed models were used for the estimation process. 
 
 ```{r RMark_1, include = F, echo=F, message=F, cache=TRUE}
 # load results from the most recent run here:
-load('RData/Mark_Analysis_output_2017-09-20.RData')
+load('RData/Mark_Analysis_output_2019-09-23.RData')
 ```
 
 GOODNESS OF FIT RESULTS HERE.
@@ -124,7 +91,7 @@ Among the closed models compared, the simplest (pdot) was considered the most pa
 
 ```{r Bayes_1, include = F, echo=F, message=F, cache=TRUE}
 # rather than running the whole thing, load the results from the most recent run:
-load('RData/Bayes_Analysis_output_2017-12-13.RData')
+load('RData/Bayes_Analysis_output_2019-09-23.RData')
 ```
 
 For the Bayesian approach, the individual random effects model (Mh) was the best model according to the deviance information criteria (DIC; Table 2). The estimated abundance (mean) was ```r signif(Bayes.results.table[1, 'N'], digits = 3)``` with its 95% PI ```r Bayes.results.table[1, 'N_lcl']``` - ```r Bayes.results.table[1, 'N_ucl']```.  
